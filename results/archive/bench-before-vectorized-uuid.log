@@ -1,0 +1,82 @@
+rows=100000 round=1/5 postgres  rows      total_ipc=1.991s total_pandas=2.011s peak_rss=+208MiB
+rows=100000 round=1/5 postgres  adbc_rows total_ipc=2.742s total_pandas=2.751s peak_rss=+122MiB
+rows=100000 round=1/5 postgres  arrow     total_ipc=0.356s total_pandas=0.488s peak_rss=+117MiB
+rows=100000 round=1/5 duckdb    rows      total_ipc=1.519s total_pandas=1.534s peak_rss=+150MiB
+rows=100000 round=1/5 duckdb    adbc_rows total_ipc=1.857s total_pandas=1.874s peak_rss=+131MiB
+rows=100000 round=1/5 duckdb    arrow     total_ipc=0.060s total_pandas=0.067s peak_rss=+98MiB
+rows=100000 round=1/5 flightsql rows      total_ipc=2.280s total_pandas=2.281s peak_rss=+180MiB
+rows=100000 round=1/5 flightsql adbc_rows total_ipc=1.925s total_pandas=1.938s peak_rss=+124MiB
+rows=100000 round=1/5 flightsql arrow     total_ipc=0.074s total_pandas=0.076s peak_rss=+84MiB
+rows=100000 round=2/5 postgres  rows      total_ipc=1.863s total_pandas=1.879s peak_rss=+218MiB
+rows=100000 round=2/5 postgres  adbc_rows total_ipc=2.633s total_pandas=2.626s peak_rss=+123MiB
+rows=100000 round=2/5 postgres  arrow     total_ipc=0.335s total_pandas=0.465s peak_rss=+118MiB
+rows=100000 round=2/5 duckdb    rows      total_ipc=1.243s total_pandas=1.261s peak_rss=+138MiB
+rows=100000 round=2/5 duckdb    adbc_rows total_ipc=1.916s total_pandas=1.925s peak_rss=+131MiB
+rows=100000 round=2/5 duckdb    arrow     total_ipc=0.062s total_pandas=0.070s peak_rss=+100MiB
+rows=100000 round=2/5 flightsql rows      total_ipc=2.215s total_pandas=2.753s peak_rss=+180MiB
+rows=100000 round=2/5 flightsql adbc_rows total_ipc=1.864s total_pandas=1.878s peak_rss=+126MiB
+rows=100000 round=2/5 flightsql arrow     total_ipc=0.080s total_pandas=0.094s peak_rss=+88MiB
+rows=100000 round=3/5 postgres  rows      total_ipc=1.883s total_pandas=1.906s peak_rss=+212MiB
+rows=100000 round=3/5 postgres  adbc_rows total_ipc=2.806s total_pandas=2.799s peak_rss=+124MiB
+rows=100000 round=3/5 postgres  arrow     total_ipc=0.361s total_pandas=0.523s peak_rss=+118MiB
+rows=100000 round=3/5 duckdb    rows      total_ipc=1.363s total_pandas=1.374s peak_rss=+157MiB
+rows=100000 round=3/5 duckdb    adbc_rows total_ipc=1.792s total_pandas=1.817s peak_rss=+131MiB
+rows=100000 round=3/5 duckdb    arrow     total_ipc=0.075s total_pandas=0.114s peak_rss=+97MiB
+rows=100000 round=3/5 flightsql rows      total_ipc=2.316s total_pandas=2.325s peak_rss=+181MiB
+rows=100000 round=3/5 flightsql adbc_rows total_ipc=1.810s total_pandas=1.821s peak_rss=+126MiB
+rows=100000 round=3/5 flightsql arrow     total_ipc=0.074s total_pandas=0.091s peak_rss=+86MiB
+rows=100000 round=4/5 postgres  rows      total_ipc=2.030s total_pandas=2.039s peak_rss=+204MiB
+rows=100000 round=4/5 postgres  adbc_rows total_ipc=2.774s total_pandas=2.768s peak_rss=+126MiB
+rows=100000 round=4/5 postgres  arrow     total_ipc=0.363s total_pandas=0.510s peak_rss=+117MiB
+rows=100000 round=4/5 duckdb    rows      total_ipc=1.313s total_pandas=1.339s peak_rss=+150MiB
+rows=100000 round=4/5 duckdb    adbc_rows total_ipc=1.759s total_pandas=1.774s peak_rss=+132MiB
+rows=100000 round=4/5 duckdb    arrow     total_ipc=0.059s total_pandas=0.070s peak_rss=+98MiB
+rows=100000 round=4/5 flightsql rows      total_ipc=2.136s total_pandas=2.144s peak_rss=+178MiB
+rows=100000 round=4/5 flightsql adbc_rows total_ipc=2.216s total_pandas=2.225s peak_rss=+124MiB
+rows=100000 round=4/5 flightsql arrow     total_ipc=0.075s total_pandas=0.101s peak_rss=+87MiB
+rows=100000 round=5/5 postgres  rows      total_ipc=2.117s total_pandas=2.131s peak_rss=+212MiB
+rows=100000 round=5/5 postgres  adbc_rows total_ipc=2.928s total_pandas=2.923s peak_rss=+121MiB
+rows=100000 round=5/5 postgres  arrow     total_ipc=0.357s total_pandas=0.508s peak_rss=+117MiB
+rows=100000 round=5/5 duckdb    rows      total_ipc=1.434s total_pandas=1.450s peak_rss=+150MiB
+rows=100000 round=5/5 duckdb    adbc_rows total_ipc=2.190s total_pandas=2.207s peak_rss=+131MiB
+rows=100000 round=5/5 duckdb    arrow     total_ipc=0.070s total_pandas=0.098s peak_rss=+100MiB
+rows=100000 round=5/5 flightsql rows      total_ipc=2.348s total_pandas=2.363s peak_rss=+179MiB
+rows=100000 round=5/5 flightsql adbc_rows total_ipc=1.816s total_pandas=1.829s peak_rss=+124MiB
+rows=100000 round=5/5 flightsql arrow     total_ipc=0.068s total_pandas=0.082s peak_rss=+83MiB
+rows=1000000 round=1/3 postgres  rows      total_ipc=19.426s total_pandas=19.407s peak_rss=+1870MiB
+rows=1000000 round=1/3 postgres  adbc_rows total_ipc=26.664s total_pandas=26.617s peak_rss=+1080MiB
+rows=1000000 round=1/3 postgres  arrow     total_ipc=4.121s total_pandas=5.314s peak_rss=+1022MiB
+rows=1000000 round=1/3 duckdb    rows      total_ipc=12.361s total_pandas=12.503s peak_rss=+1328MiB
+rows=1000000 round=1/3 duckdb    adbc_rows total_ipc=18.028s total_pandas=18.108s peak_rss=+1203MiB
+rows=1000000 round=1/3 duckdb    arrow     total_ipc=0.572s total_pandas=0.602s peak_rss=+928MiB
+rows=1000000 round=1/3 flightsql rows      total_ipc=20.774s total_pandas=20.904s peak_rss=+1619MiB
+rows=1000000 round=1/3 flightsql adbc_rows total_ipc=18.783s total_pandas=18.835s peak_rss=+1024MiB
+rows=1000000 round=1/3 flightsql arrow     total_ipc=0.501s total_pandas=0.490s peak_rss=+697MiB
+rows=1000000 round=2/3 postgres  rows      total_ipc=19.477s total_pandas=19.459s peak_rss=+1880MiB
+rows=1000000 round=2/3 postgres  adbc_rows total_ipc=25.826s total_pandas=25.635s peak_rss=+1083MiB
+rows=1000000 round=2/3 postgres  arrow     total_ipc=4.131s total_pandas=5.308s peak_rss=+1022MiB
+rows=1000000 round=2/3 duckdb    rows      total_ipc=13.002s total_pandas=13.068s peak_rss=+1322MiB
+rows=1000000 round=2/3 duckdb    adbc_rows total_ipc=18.432s total_pandas=18.459s peak_rss=+1210MiB
+rows=1000000 round=2/3 duckdb    arrow     total_ipc=0.553s total_pandas=0.506s peak_rss=+897MiB
+rows=1000000 round=2/3 flightsql rows      total_ipc=21.169s total_pandas=21.309s peak_rss=+1620MiB
+rows=1000000 round=2/3 flightsql adbc_rows total_ipc=18.450s total_pandas=18.529s peak_rss=+1024MiB
+rows=1000000 round=2/3 flightsql arrow     total_ipc=0.520s total_pandas=0.495s peak_rss=+696MiB
+rows=1000000 round=3/3 postgres  rows      total_ipc=19.989s total_pandas=20.036s peak_rss=+1878MiB
+rows=1000000 round=3/3 postgres  adbc_rows total_ipc=25.972s total_pandas=25.798s peak_rss=+1080MiB
+rows=1000000 round=3/3 postgres  arrow     total_ipc=3.981s total_pandas=5.253s peak_rss=+1022MiB
+rows=1000000 round=3/3 duckdb    rows      total_ipc=11.822s total_pandas=11.870s peak_rss=+1329MiB
+rows=1000000 round=3/3 duckdb    adbc_rows total_ipc=17.159s total_pandas=17.216s peak_rss=+1205MiB
+rows=1000000 round=3/3 duckdb    arrow     total_ipc=0.554s total_pandas=0.547s peak_rss=+905MiB
+rows=1000000 round=3/3 flightsql rows      total_ipc=21.769s total_pandas=21.900s peak_rss=+1628MiB
+rows=1000000 round=3/3 flightsql adbc_rows total_ipc=18.643s total_pandas=18.700s peak_rss=+1026MiB
+rows=1000000 round=3/3 flightsql arrow     total_ipc=0.474s total_pandas=0.553s peak_rss=+727MiB
+skip postgres/rows/10000000: est 18.3 GiB
+skip postgres/adbc_rows/10000000: est 10.6 GiB
+skip postgres/arrow/10000000: est 10.0 GiB
+skip duckdb/rows/10000000: est 13.0 GiB
+skip duckdb/adbc_rows/10000000: est 11.8 GiB
+skip duckdb/arrow/10000000: est 8.8 GiB
+skip flightsql/rows/10000000: est 15.8 GiB
+skip flightsql/adbc_rows/10000000: est 10.0 GiB
+skip flightsql/arrow/10000000: est 6.8 GiB
+wrote results/bench-full.json
