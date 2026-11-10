@@ -1,0 +1,11 @@
+python 3.12; sqlalchemy 2.1.8 sqlalchemy-adbc 0.9.5 adbc-driver-flightsql 1.13.0
+server: GizmoSQL v1.42.2 (DuckDB v1.5.6) from docker-compose.yml; URL flightsql+adbc://bench:***@127.0.0.1:31347?tls=false&auth=basic
+SELECT count(*) FROM bench_1000: [(1000,)]
+get_schema_names() -> ['main', 'information_schema', 'pg_catalog']
+get_table_names() -> ['bench_1000', 'bench_100000', 'bench_1000000', 'bench_10000000']
+get_table_names(schema='main') -> ['bench_1000', 'bench_100000', 'bench_1000000', 'bench_10000000']
+get_columns('bench_1000') -> [('id', 'BIGINT'), ('i32', 'INTEGER'), ('f64', 'FLOAT'), ('dec', 'NUMERIC'), ('txt', 'VARCHAR'), ('ts_tz', 'DATETIME'), ('ts', 'DATETIME'), ('d', 'DATE'), ('b', 'BOOLEAN'), ('js', 'JSON'), ('u', 'CHAR(32)')]
+get_columns('bench_1000', schema='main') -> [('id', 'BIGINT'), ('i32', 'INTEGER'), ('f64', 'FLOAT'), ('dec', 'NUMERIC'), ('txt', 'VARCHAR'), ('ts_tz', 'DATETIME'), ('ts', 'DATETIME'), ('d', 'DATE'), ('b', 'BOOLEAN'), ('js', 'JSON'), ('u', 'CHAR(32)')]
+--- rerun with sqlalchemy 2.0.57 (Superset master pin >=2.0.55,<2.1)
+get_table_names() -> ['bench_1000', 'bench_100000', 'bench_1000000', 'bench_10000000']
+get_columns('bench_1000') -> [('id', 'BIGINT'), ('i32', 'INTEGER'), ('f64', 'FLOAT'), ('dec', 'NUMERIC'), ('txt', 'VARCHAR'), ('ts_tz', 'DATETIME'), ('ts', 'DATETIME'), ('d', 'DATE'), ('b', 'BOOLEAN'), ('js', 'JSON'), ('u', 'CHAR(32)')]
