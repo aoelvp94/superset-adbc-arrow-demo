@@ -1,0 +1,4 @@
+=========================== short test summary info ============================
+FAILED tests/unit_tests/sql_lab_test.py::test_get_sql_results_oauth2 - assert...
+1 failed, 459 passed in 9.25s
+Note: test_get_sql_results_oauth2 also fails on unpatched master a131fcb in this environment (checked with git stash); it is unrelated to the patch.

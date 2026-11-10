@@ -1,0 +1,6 @@
+<stdin>:5: SADeprecationWarning: The dbapi() classmethod on dialect classes has been renamed to import_dbapi().  Implement an import_dbapi() classmethod directly on class <class 'flightsql.sqlalchemy.DataFusionDialect'> to remove this warning; the old .dbapi() classmethod may be maintained for backwards compatibility.
+flightsql-dbapi 0.2.2 installed with --no-deps; sqlalchemy 2.0.57
+SELECT 1 -> [(1,)]
+warnings: []
+get_table_names() -> ['bench_1000', 'bench_100000', 'bench_1000000', 'bench_10000000']
+get_columns('bench_1000') -> [('id', 'BIGINT'), ('i32', 'INTEGER'), ('f64', 'FLOAT'), ('dec', 'DECIMAL'), ('txt', 'TEXT'), ('ts_tz', 'TIMESTAMP'), ('ts', 'TIMESTAMP'), ('d', 'DATE'), ('b', 'BOOLEAN'), ('js', 'TEXT'), ('u', 'TEXT')]
