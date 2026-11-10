@@ -1,0 +1,357 @@
+{
+ "started_utc": "2026-11-10T08:10:45.568198+00:00",
+ "finished_utc": "2026-11-10T08:12:13.709933+00:00",
+ "env": {
+  "python": "3.11.17",
+  "platform": "Linux-6.12.113+-x86_64-with-glibc2.41",
+  "apache-superset": "0.0.0.dev0",
+  "pyarrow": "26.0.1",
+  "pandas": "3.1.1",
+  "numpy": "2.4.6",
+  "sqlalchemy": "2.0.57",
+  "duckdb": "1.5.6",
+  "duckdb-engine": "0.17.0",
+  "psycopg2-binary": "2.9.13",
+  "adbc-driver-manager": "1.13.0",
+  "adbc-driver-postgresql": "1.13.0",
+  "adbc-driver-flightsql": "1.13.0",
+  "flightsql-dbapi": "0.2.2",
+  "superset_commit": "a131fcb623d88ed9eb7e7a414e226437423d645c",
+  "cpu": "Intel(R) Xeon(R) Processor",
+  "cpu_count": 8,
+  "mem_total_gb": 15.6,
+  "docker_images": [
+   "/sab-postgres postgres:17.6 sha256:50903ccdcab597707a1f61c7ae016a06b0b548da53a6f7ad716d56b072bedba0",
+   "/sab-flightsql sab-flightsql:gizmosql-1.42.2-json sha256:904b5882e073441855f7a51212819bba1791b00cfaa8950f36de2af08a0cc015"
+  ]
+ },
+ "args": {
+  "rows": [
+   3000000
+  ],
+  "rounds": [
+   3
+  ],
+  "backends": [
+   "postgres",
+   "duckdb",
+   "flightsql"
+  ],
+  "paths": [
+   "arrow"
+  ],
+  "max_rss_gb": 5.0,
+  "timeout": 1800,
+  "out": "results/bench-large-ipc-3m.json",
+  "downstream": "ipc"
+ },
+ "results": [
+  {
+   "backend": "postgres",
+   "path": "arrow",
+   "rows": 3000000,
+   "rounds": 3,
+   "downstream": "ipc",
+   "fetch_s": {
+    "median": 3.3273232279989315,
+    "min": 3.174082501000157,
+    "max": 3.462816490999103
+   },
+   "result_set_s": {
+    "median": 1.09540139100136,
+    "min": 1.0172369129995786,
+    "max": 1.1169646920006926
+   },
+   "ipc_s": {
+    "median": 0.5332862139985082,
+    "min": 0.5101941580014682,
+    "max": 0.780267651000031
+   },
+   "pandas_s": null,
+   "total_ipc_s": {
+    "median": 4.854754298999978,
+    "min": 4.824333406999358,
+    "max": 5.338485533000494
+   },
+   "total_pandas_s": null,
+   "peak_rss_delta_bytes_median": 1277931520,
+   "arrow_pool_peak_bytes_median": 705638080,
+   "tracemalloc_peak_bytes": 11713711,
+   "ipc_bytes": 427687528,
+   "n_rows_out": 3000000,
+   "raw": [
+    {
+     "backend": "postgres",
+     "path": "arrow",
+     "rows": 3000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 3000000,
+     "n_cols": 11,
+     "fetch_s": 3.462816490999103,
+     "result_set_s": 1.09540139100136,
+     "ipc_s": 0.780267651000031,
+     "pandas_s": null,
+     "total_ipc_s": 5.338485533000494,
+     "total_pandas_s": null,
+     "ipc_bytes": 427687528,
+     "rss_baseline_bytes": 319086592,
+     "peak_rss_delta_bytes": 1553383424,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 705638080,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "postgres",
+     "path": "arrow",
+     "rows": 3000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 3000000,
+     "n_cols": 11,
+     "fetch_s": 3.3273232279989315,
+     "result_set_s": 1.0172369129995786,
+     "ipc_s": 0.5101941580014682,
+     "pandas_s": null,
+     "total_ipc_s": 4.854754298999978,
+     "total_pandas_s": null,
+     "ipc_bytes": 427687528,
+     "rss_baseline_bytes": 318984192,
+     "peak_rss_delta_bytes": 1277931520,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 705638080,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "postgres",
+     "path": "arrow",
+     "rows": 3000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 3000000,
+     "n_cols": 11,
+     "fetch_s": 3.174082501000157,
+     "result_set_s": 1.1169646920006926,
+     "ipc_s": 0.5332862139985082,
+     "pandas_s": null,
+     "total_ipc_s": 4.824333406999358,
+     "total_pandas_s": null,
+     "ipc_bytes": 427687528,
+     "rss_baseline_bytes": 318902272,
+     "peak_rss_delta_bytes": 1277091840,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 705638080,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    }
+   ]
+  },
+  {
+   "backend": "duckdb",
+   "path": "arrow",
+   "rows": 3000000,
+   "rounds": 3,
+   "downstream": "ipc",
+   "fetch_s": {
+    "median": 0.7856138340011967,
+    "min": 0.7439211640012218,
+    "max": 0.8699086590004299
+   },
+   "result_set_s": {
+    "median": 0.0004509269983827835,
+    "min": 0.0004230309987178771,
+    "max": 0.000466693998532719
+   },
+   "ipc_s": {
+    "median": 0.5096137700002146,
+    "min": 0.4419757560008293,
+    "max": 0.8191181840011268
+   },
+   "pandas_s": null,
+   "total_ipc_s": {
+    "median": 1.3799891229991772,
+    "min": 1.2280126210007438,
+    "max": 1.5634902750007313
+   },
+   "total_pandas_s": null,
+   "peak_rss_delta_bytes_median": 1998188544,
+   "arrow_pool_peak_bytes_median": 536871616,
+   "tracemalloc_peak_bytes": 18232,
+   "ipc_bytes": 408891864,
+   "n_rows_out": 3000000,
+   "raw": [
+    {
+     "backend": "duckdb",
+     "path": "arrow",
+     "rows": 3000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 3000000,
+     "n_cols": 11,
+     "fetch_s": 0.7856138340011967,
+     "result_set_s": 0.0004230309987178771,
+     "ipc_s": 0.4419757560008293,
+     "pandas_s": null,
+     "total_ipc_s": 1.2280126210007438,
+     "total_pandas_s": null,
+     "ipc_bytes": 408891864,
+     "rss_baseline_bytes": 343470080,
+     "peak_rss_delta_bytes": 2006970368,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 536871616,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "duckdb",
+     "path": "arrow",
+     "rows": 3000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 3000000,
+     "n_cols": 11,
+     "fetch_s": 0.8699086590004299,
+     "result_set_s": 0.000466693998532719,
+     "ipc_s": 0.5096137700002146,
+     "pandas_s": null,
+     "total_ipc_s": 1.3799891229991772,
+     "total_pandas_s": null,
+     "ipc_bytes": 408891864,
+     "rss_baseline_bytes": 343691264,
+     "peak_rss_delta_bytes": 1994706944,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 536871616,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "duckdb",
+     "path": "arrow",
+     "rows": 3000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 3000000,
+     "n_cols": 11,
+     "fetch_s": 0.7439211640012218,
+     "result_set_s": 0.0004509269983827835,
+     "ipc_s": 0.8191181840011268,
+     "pandas_s": null,
+     "total_ipc_s": 1.5634902750007313,
+     "total_pandas_s": null,
+     "ipc_bytes": 408891864,
+     "rss_baseline_bytes": 343588864,
+     "peak_rss_delta_bytes": 1998188544,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 536871616,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    }
+   ]
+  },
+  {
+   "backend": "flightsql",
+   "path": "arrow",
+   "rows": 3000000,
+   "rounds": 3,
+   "downstream": "ipc",
+   "fetch_s": {
+    "median": 0.6286346350007079,
+    "min": 0.6011891430007381,
+    "max": 0.6490667790003499
+   },
+   "result_set_s": {
+    "median": 0.00048356899969803635,
+    "min": 0.000417179999203654,
+    "max": 0.0004837039996345993
+   },
+   "ipc_s": {
+    "median": 0.5176778259992716,
+    "min": 0.4368838969985518,
+    "max": 0.537527685999521
+   },
+   "pandas_s": null,
+   "total_ipc_s": {
+    "median": 1.1192841489992134,
+    "min": 1.0660021009989578,
+    "max": 1.1870781689995056
+   },
+   "total_pandas_s": null,
+   "peak_rss_delta_bytes_median": 1412902912,
+   "arrow_pool_peak_bytes_median": 536871616,
+   "tracemalloc_peak_bytes": 18464,
+   "ipc_bytes": 408891864,
+   "n_rows_out": 3000000,
+   "raw": [
+    {
+     "backend": "flightsql",
+     "path": "arrow",
+     "rows": 3000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 3000000,
+     "n_cols": 11,
+     "fetch_s": 0.6011891430007381,
+     "result_set_s": 0.000417179999203654,
+     "ipc_s": 0.5176778259992716,
+     "pandas_s": null,
+     "total_ipc_s": 1.1192841489992134,
+     "total_pandas_s": null,
+     "ipc_bytes": 408891864,
+     "rss_baseline_bytes": 334159872,
+     "peak_rss_delta_bytes": 1412902912,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 536871616,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "flightsql",
+     "path": "arrow",
+     "rows": 3000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 3000000,
+     "n_cols": 11,
+     "fetch_s": 0.6490667790003499,
+     "result_set_s": 0.0004837039996345993,
+     "ipc_s": 0.537527685999521,
+     "pandas_s": null,
+     "total_ipc_s": 1.1870781689995056,
+     "total_pandas_s": null,
+     "ipc_bytes": 408891864,
+     "rss_baseline_bytes": 333991936,
+     "peak_rss_delta_bytes": 1412165632,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 536871616,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "flightsql",
+     "path": "arrow",
+     "rows": 3000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 3000000,
+     "n_cols": 11,
+     "fetch_s": 0.6286346350007079,
+     "result_set_s": 0.00048356899969803635,
+     "ipc_s": 0.4368838969985518,
+     "pandas_s": null,
+     "total_ipc_s": 1.0660021009989578,
+     "total_pandas_s": null,
+     "ipc_bytes": 408891864,
+     "rss_baseline_bytes": 334426112,
+     "peak_rss_delta_bytes": 1415118848,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 536871616,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    }
+   ]
+  }
+ ],
+ "skipped": []
+}

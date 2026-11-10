@@ -1,0 +1,13 @@
+rows=1000000 round=1/3 postgres  arrow     total_ipc=1.741s peak_rss=+599MiB
+rows=1000000 round=1/3 duckdb    arrow     total_ipc=0.628s peak_rss=+743MiB
+rows=1000000 round=1/3 flightsql arrow     total_ipc=0.512s peak_rss=+548MiB
+rows=1000000 round=2/3 postgres  arrow     total_ipc=1.808s peak_rss=+607MiB
+rows=1000000 round=2/3 duckdb    arrow     total_ipc=0.468s peak_rss=+747MiB
+rows=1000000 round=2/3 flightsql arrow     total_ipc=0.500s peak_rss=+546MiB
+rows=1000000 round=3/3 postgres  arrow     total_ipc=1.757s peak_rss=+607MiB
+rows=1000000 round=3/3 duckdb    arrow     total_ipc=0.453s peak_rss=+743MiB
+rows=1000000 round=3/3 flightsql arrow     total_ipc=0.479s peak_rss=+545MiB
+skip postgres/arrow/10000000: est 5.9 GiB
+skip duckdb/arrow/10000000: est 7.3 GiB
+skip flightsql/arrow/10000000: est 5.3 GiB
+wrote results/bench-large-ipc.json

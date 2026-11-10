@@ -1,0 +1,2902 @@
+{
+ "postgres": {
+  "bench_table": {
+   "errors": {},
+   "rows_vs_arrow": [
+    {
+     "column": "i32",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dec",
+     "arrow_types": [
+      "decimal128(7, 4)",
+      "decimal128(38, 4)"
+     ]
+    },
+    {
+     "column": "js",
+     "ipc_values": {
+      "n_diff": 942,
+      "example": [
+       [
+        "str",
+        "{\"k\": 1, \"tag\": \"x1\"}"
+       ],
+       [
+        "str",
+        "{\"k\" : 1, \"tag\" : \"x1\"}"
+       ]
+      ]
+     }
+    }
+   ],
+   "adbc_rows_vs_arrow": [
+    {
+     "column": "id",
+     "columns": [
+      [
+       "INT",
+       "0",
+       false
+      ],
+      [
+       "LONGINTEGER",
+       "0",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "i32",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ],
+     "columns": [
+      [
+       "INT",
+       "0",
+       false
+      ],
+      [
+       "INTEGER",
+       "0",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "dec",
+     "arrow_types": [
+      "string",
+      "decimal128(38, 4)"
+     ],
+     "columns": [
+      [
+       "STRING",
+       "1",
+       false
+      ],
+      [
+       "DECIMAL",
+       "0",
+       false
+      ]
+     ],
+     "ipc_values": {
+      "n_diff": 910,
+      "example": [
+       [
+        "str",
+        "0.1429"
+       ],
+       [
+        "dec",
+        "0.1429"
+       ]
+      ]
+     }
+    },
+    {
+     "column": "ts_tz",
+     "columns": [
+      [
+       "DATETIME",
+       "2",
+       true
+      ],
+      [
+       "DATETIMETZ",
+       "2",
+       true
+      ]
+     ]
+    },
+    {
+     "column": "d",
+     "columns": [
+      [
+       "DATETIME",
+       "2",
+       true
+      ],
+      [
+       "DATE",
+       "2",
+       true
+      ]
+     ]
+    },
+    {
+     "column": "b",
+     "columns": [
+      [
+       "BOOL",
+       "3",
+       false
+      ],
+      [
+       "BOOLEAN",
+       "3",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "js",
+     "columns": [
+      [
+       "STRING",
+       "1",
+       false
+      ],
+      [
+       "JSON",
+       "1",
+       false
+      ]
+     ],
+     "py_types": [
+      [
+       "str"
+      ],
+      [
+       "dict"
+      ]
+     ],
+     "values": {
+      "n_diff": 942,
+      "example": [
+       [
+        "str",
+        "{\"k\" : 1, \"tag\" : \"x1\"}"
+       ],
+       [
+        "json",
+        "{\"k\": 1, \"tag\": \"x1\"}"
+       ]
+      ]
+     },
+     "nested_columns": [
+      false,
+      true
+     ]
+    }
+   ],
+   "rows_vs_adbc_rows": [
+    {
+     "column": "id",
+     "columns": [
+      [
+       "LONGINTEGER",
+       "0",
+       false
+      ],
+      [
+       "INT",
+       "0",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "i32",
+     "columns": [
+      [
+       "INTEGER",
+       "0",
+       false
+      ],
+      [
+       "INT",
+       "0",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "dec",
+     "arrow_types": [
+      "decimal128(7, 4)",
+      "string"
+     ],
+     "columns": [
+      [
+       "DECIMAL",
+       "0",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ],
+     "ipc_values": {
+      "n_diff": 910,
+      "example": [
+       [
+        "dec",
+        "0.1429"
+       ],
+       [
+        "str",
+        "0.1429"
+       ]
+      ]
+     }
+    },
+    {
+     "column": "ts_tz",
+     "columns": [
+      [
+       "DATETIMETZ",
+       "2",
+       true
+      ],
+      [
+       "DATETIME",
+       "2",
+       true
+      ]
+     ]
+    },
+    {
+     "column": "d",
+     "columns": [
+      [
+       "DATE",
+       "2",
+       true
+      ],
+      [
+       "DATETIME",
+       "2",
+       true
+      ]
+     ]
+    },
+    {
+     "column": "b",
+     "columns": [
+      [
+       "BOOLEAN",
+       "3",
+       false
+      ],
+      [
+       "BOOL",
+       "3",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "js",
+     "columns": [
+      [
+       "JSON",
+       "1",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ],
+     "py_types": [
+      [
+       "dict"
+      ],
+      [
+       "str"
+      ]
+     ],
+     "values": {
+      "n_diff": 942,
+      "example": [
+       [
+        "json",
+        "{\"k\": 1, \"tag\": \"x1\"}"
+       ],
+       [
+        "str",
+        "{\"k\" : 1, \"tag\" : \"x1\"}"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 942,
+      "example": [
+       [
+        "str",
+        "{\"k\": 1, \"tag\": \"x1\"}"
+       ],
+       [
+        "str",
+        "{\"k\" : 1, \"tag\" : \"x1\"}"
+       ]
+      ]
+     },
+     "nested_columns": [
+      true,
+      false
+     ]
+    }
+   ],
+   "schemas": {
+    "rows": {
+     "arrow_types": {
+      "id": "int64",
+      "i32": "int64",
+      "f64": "double",
+      "dec": "decimal128(7, 4)",
+      "txt": "string",
+      "ts_tz": "timestamp[us, tz=UTC]",
+      "ts": "timestamp[us]",
+      "d": "date32[day]",
+      "b": "bool",
+      "js": "string",
+      "u": "string"
+     },
+     "columns": {
+      "id": [
+       "LONGINTEGER",
+       "0",
+       false
+      ],
+      "i32": [
+       "INTEGER",
+       "0",
+       false
+      ],
+      "f64": [
+       "FLOAT",
+       "0",
+       false
+      ],
+      "dec": [
+       "DECIMAL",
+       "0",
+       false
+      ],
+      "txt": [
+       "STRING",
+       "1",
+       false
+      ],
+      "ts_tz": [
+       "DATETIMETZ",
+       "2",
+       true
+      ],
+      "ts": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "d": [
+       "DATE",
+       "2",
+       true
+      ],
+      "b": [
+       "BOOLEAN",
+       "3",
+       false
+      ],
+      "js": [
+       "JSON",
+       "1",
+       false
+      ],
+      "u": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    },
+    "adbc_rows": {
+     "arrow_types": {
+      "id": "int64",
+      "i32": "int64",
+      "f64": "double",
+      "dec": "string",
+      "txt": "string",
+      "ts_tz": "timestamp[us, tz=UTC]",
+      "ts": "timestamp[us]",
+      "d": "date32[day]",
+      "b": "bool",
+      "js": "string",
+      "u": "string"
+     },
+     "columns": {
+      "id": [
+       "INT",
+       "0",
+       false
+      ],
+      "i32": [
+       "INT",
+       "0",
+       false
+      ],
+      "f64": [
+       "FLOAT",
+       "0",
+       false
+      ],
+      "dec": [
+       "STRING",
+       "1",
+       false
+      ],
+      "txt": [
+       "STRING",
+       "1",
+       false
+      ],
+      "ts_tz": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "d": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "b": [
+       "BOOL",
+       "3",
+       false
+      ],
+      "js": [
+       "STRING",
+       "1",
+       false
+      ],
+      "u": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    },
+    "arrow": {
+     "arrow_types": {
+      "id": "int64",
+      "i32": "int32",
+      "f64": "double",
+      "dec": "decimal128(38, 4)",
+      "txt": "string",
+      "ts_tz": "timestamp[us, tz=UTC]",
+      "ts": "timestamp[us]",
+      "d": "date32[day]",
+      "b": "bool",
+      "js": "string",
+      "u": "string"
+     },
+     "columns": {
+      "id": [
+       "LONGINTEGER",
+       "0",
+       false
+      ],
+      "i32": [
+       "INTEGER",
+       "0",
+       false
+      ],
+      "f64": [
+       "FLOAT",
+       "0",
+       false
+      ],
+      "dec": [
+       "DECIMAL",
+       "0",
+       false
+      ],
+      "txt": [
+       "STRING",
+       "1",
+       false
+      ],
+      "ts_tz": [
+       "DATETIMETZ",
+       "2",
+       true
+      ],
+      "ts": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "d": [
+       "DATE",
+       "2",
+       true
+      ],
+      "b": [
+       "BOOLEAN",
+       "3",
+       false
+      ],
+      "js": [
+       "JSON",
+       "1",
+       false
+      ],
+      "u": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    }
+   }
+  },
+  "edge_cases": {
+   "errors": {},
+   "rows_vs_arrow": [
+    {
+     "column": "dup",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dup__1",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "numeric_nan",
+     "arrow_types": [
+      "null",
+      "string"
+     ]
+    },
+    {
+     "column": "numeric_wide",
+     "arrow_types": [
+      "decimal256(39, 9)",
+      "decimal256(76, 9)"
+     ]
+    },
+    {
+     "column": "iv",
+     "arrow_types": [
+      "double",
+      "month_day_nano_interval"
+     ],
+     "py_types": [
+      [
+       "float"
+      ],
+      [
+       "DateOffset"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "f",
+        "93784000.0"
+       ],
+       [
+        "DateOffset",
+        "<DateOffset: days=1, months=0, nanoseconds=7384000000000>"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "f",
+        "93784000.0"
+       ],
+       [
+        "MonthDayNano",
+        [
+         0,
+         1,
+         7384000000000
+        ]
+       ]
+      ]
+     }
+    },
+    {
+     "column": "json_scalar",
+     "arrow_types": [
+      "int64",
+      "string"
+     ],
+     "py_types": [
+      [
+       "int"
+      ],
+      [
+       "str"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "int",
+        5
+       ],
+       [
+        "str",
+        "5"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "int",
+        5
+       ],
+       [
+        "str",
+        "5"
+       ]
+      ]
+     }
+    },
+    {
+     "column": "all_null",
+     "arrow_types": [
+      "null",
+      "string"
+     ]
+    }
+   ],
+   "adbc_rows_vs_arrow": [
+    {
+     "column": "dup",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ],
+     "columns": [
+      [
+       "INT",
+       "0",
+       false
+      ],
+      [
+       "INTEGER",
+       "0",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "dup__1",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ],
+     "columns": [
+      [
+       "INT",
+       "0",
+       false
+      ],
+      [
+       "INTEGER",
+       "0",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "numeric_nan",
+     "columns": [
+      [
+       "STRING",
+       "1",
+       false
+      ],
+      [
+       "DECIMAL",
+       "0",
+       false
+      ]
+     ],
+     "py_types": [
+      [
+       "str"
+      ],
+      []
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "str",
+        "nan"
+       ],
+       null
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "str",
+        "nan"
+       ],
+       null
+      ]
+     }
+    },
+    {
+     "column": "numeric_wide",
+     "arrow_types": [
+      "string",
+      "decimal256(76, 9)"
+     ],
+     "columns": [
+      [
+       "STRING",
+       "1",
+       false
+      ],
+      [
+       "DECIMAL",
+       "0",
+       false
+      ]
+     ],
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "str",
+        "123456789012345678901234567890.123456789"
+       ],
+       [
+        "dec",
+        "123456789012345678901234567890.123456789"
+       ]
+      ]
+     }
+    },
+    {
+     "column": "iv",
+     "columns": [
+      [
+       "DATETIME",
+       "2",
+       true
+      ],
+      [
+       "INTERVAL",
+       "0",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "int_array",
+     "columns": [
+      [
+       "STRING",
+       "1",
+       false
+      ],
+      [
+       "INTEGERARRAY",
+       "0",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "jsonb_obj",
+     "columns": [
+      [
+       "STRING",
+       "1",
+       false
+      ],
+      [
+       "JSONB",
+       "1",
+       false
+      ]
+     ],
+     "py_types": [
+      [
+       "str"
+      ],
+      [
+       "dict"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "str",
+        "{\"a\": [1, 2]}"
+       ],
+       [
+        "json",
+        "{\"a\": [1, 2]}"
+       ]
+      ]
+     },
+     "nested_columns": [
+      false,
+      true
+     ]
+    },
+    {
+     "column": "json_scalar",
+     "columns": [
+      [
+       "STRING",
+       "1",
+       false
+      ],
+      [
+       "JSON",
+       "1",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "raw_bytes",
+     "columns": [
+      [
+       null,
+       "None",
+       false
+      ],
+      [
+       "BINARY",
+       "None",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "ts_offset",
+     "columns": [
+      [
+       "DATETIME",
+       "2",
+       true
+      ],
+      [
+       "DATETIMETZ",
+       "2",
+       true
+      ]
+     ]
+    },
+    {
+     "column": "all_null",
+     "arrow_types": [
+      "null",
+      "string"
+     ],
+     "columns": [
+      [
+       null,
+       "None",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ]
+    }
+   ],
+   "rows_vs_adbc_rows": [
+    {
+     "column": "dup",
+     "columns": [
+      [
+       "INTEGER",
+       "0",
+       false
+      ],
+      [
+       "INT",
+       "0",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "dup__1",
+     "columns": [
+      [
+       "INTEGER",
+       "0",
+       false
+      ],
+      [
+       "INT",
+       "0",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "numeric_nan",
+     "arrow_types": [
+      "null",
+      "string"
+     ],
+     "columns": [
+      [
+       "DECIMAL",
+       "0",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ],
+     "py_types": [
+      [],
+      [
+       "str"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       null,
+       [
+        "str",
+        "nan"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       null,
+       [
+        "str",
+        "nan"
+       ]
+      ]
+     }
+    },
+    {
+     "column": "numeric_wide",
+     "arrow_types": [
+      "decimal256(39, 9)",
+      "string"
+     ],
+     "columns": [
+      [
+       "DECIMAL",
+       "0",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ],
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "dec",
+        "123456789012345678901234567890.123456789"
+       ],
+       [
+        "str",
+        "123456789012345678901234567890.123456789"
+       ]
+      ]
+     }
+    },
+    {
+     "column": "iv",
+     "arrow_types": [
+      "double",
+      "month_day_nano_interval"
+     ],
+     "columns": [
+      [
+       "INTERVAL",
+       "0",
+       false
+      ],
+      [
+       "DATETIME",
+       "2",
+       true
+      ]
+     ],
+     "py_types": [
+      [
+       "float"
+      ],
+      [
+       "DateOffset"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "f",
+        "93784000.0"
+       ],
+       [
+        "DateOffset",
+        "<DateOffset: days=1, months=0, nanoseconds=7384000000000>"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "f",
+        "93784000.0"
+       ],
+       [
+        "MonthDayNano",
+        [
+         0,
+         1,
+         7384000000000
+        ]
+       ]
+      ]
+     }
+    },
+    {
+     "column": "int_array",
+     "columns": [
+      [
+       "INTEGERARRAY",
+       "0",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "jsonb_obj",
+     "columns": [
+      [
+       "JSONB",
+       "1",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ],
+     "py_types": [
+      [
+       "dict"
+      ],
+      [
+       "str"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "json",
+        "{\"a\": [1, 2]}"
+       ],
+       [
+        "str",
+        "{\"a\": [1, 2]}"
+       ]
+      ]
+     },
+     "nested_columns": [
+      true,
+      false
+     ]
+    },
+    {
+     "column": "json_scalar",
+     "arrow_types": [
+      "int64",
+      "string"
+     ],
+     "columns": [
+      [
+       "JSON",
+       "1",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ],
+     "py_types": [
+      [
+       "int"
+      ],
+      [
+       "str"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "int",
+        5
+       ],
+       [
+        "str",
+        "5"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "int",
+        5
+       ],
+       [
+        "str",
+        "5"
+       ]
+      ]
+     }
+    },
+    {
+     "column": "raw_bytes",
+     "columns": [
+      [
+       "BINARY",
+       "None",
+       false
+      ],
+      [
+       null,
+       "None",
+       false
+      ]
+     ]
+    },
+    {
+     "column": "ts_offset",
+     "columns": [
+      [
+       "DATETIMETZ",
+       "2",
+       true
+      ],
+      [
+       "DATETIME",
+       "2",
+       true
+      ]
+     ]
+    },
+    {
+     "column": "all_null",
+     "columns": [
+      [
+       "STRING",
+       "1",
+       false
+      ],
+      [
+       null,
+       "None",
+       false
+      ]
+     ]
+    }
+   ],
+   "schemas": {
+    "rows": {
+     "arrow_types": {
+      "dup": "int64",
+      "dup__1": "int64",
+      "numeric_nan": "null",
+      "numeric_wide": "decimal256(39, 9)",
+      "iv": "double",
+      "int_array": "string",
+      "jsonb_obj": "string",
+      "json_scalar": "int64",
+      "raw_bytes": "binary",
+      "ts_offset": "timestamp[us, tz=UTC]",
+      "ts_far_future": "timestamp[us]",
+      "all_null": "null"
+     },
+     "columns": {
+      "dup": [
+       "INTEGER",
+       "0",
+       false
+      ],
+      "dup__1": [
+       "INTEGER",
+       "0",
+       false
+      ],
+      "numeric_nan": [
+       "DECIMAL",
+       "0",
+       false
+      ],
+      "numeric_wide": [
+       "DECIMAL",
+       "0",
+       false
+      ],
+      "iv": [
+       "INTERVAL",
+       "0",
+       false
+      ],
+      "int_array": [
+       "INTEGERARRAY",
+       "0",
+       false
+      ],
+      "jsonb_obj": [
+       "JSONB",
+       "1",
+       false
+      ],
+      "json_scalar": [
+       "JSON",
+       "1",
+       false
+      ],
+      "raw_bytes": [
+       "BINARY",
+       "None",
+       false
+      ],
+      "ts_offset": [
+       "DATETIMETZ",
+       "2",
+       true
+      ],
+      "ts_far_future": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "all_null": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    },
+    "adbc_rows": {
+     "arrow_types": {
+      "dup": "int64",
+      "dup__1": "int64",
+      "numeric_nan": "string",
+      "numeric_wide": "string",
+      "iv": "month_day_nano_interval",
+      "int_array": "string",
+      "jsonb_obj": "string",
+      "json_scalar": "string",
+      "raw_bytes": "binary",
+      "ts_offset": "timestamp[us, tz=UTC]",
+      "ts_far_future": "timestamp[us]",
+      "all_null": "null"
+     },
+     "columns": {
+      "dup": [
+       "INT",
+       "0",
+       false
+      ],
+      "dup__1": [
+       "INT",
+       "0",
+       false
+      ],
+      "numeric_nan": [
+       "STRING",
+       "1",
+       false
+      ],
+      "numeric_wide": [
+       "STRING",
+       "1",
+       false
+      ],
+      "iv": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "int_array": [
+       "STRING",
+       "1",
+       false
+      ],
+      "jsonb_obj": [
+       "STRING",
+       "1",
+       false
+      ],
+      "json_scalar": [
+       "STRING",
+       "1",
+       false
+      ],
+      "raw_bytes": [
+       null,
+       "None",
+       false
+      ],
+      "ts_offset": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts_far_future": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "all_null": [
+       null,
+       "None",
+       false
+      ]
+     }
+    },
+    "arrow": {
+     "arrow_types": {
+      "dup": "int32",
+      "dup__1": "int32",
+      "numeric_nan": "string",
+      "numeric_wide": "decimal256(76, 9)",
+      "iv": "month_day_nano_interval",
+      "int_array": "string",
+      "jsonb_obj": "string",
+      "json_scalar": "string",
+      "raw_bytes": "binary",
+      "ts_offset": "timestamp[us, tz=UTC]",
+      "ts_far_future": "timestamp[us]",
+      "all_null": "string"
+     },
+     "columns": {
+      "dup": [
+       "INTEGER",
+       "0",
+       false
+      ],
+      "dup__1": [
+       "INTEGER",
+       "0",
+       false
+      ],
+      "numeric_nan": [
+       "DECIMAL",
+       "0",
+       false
+      ],
+      "numeric_wide": [
+       "DECIMAL",
+       "0",
+       false
+      ],
+      "iv": [
+       "INTERVAL",
+       "0",
+       false
+      ],
+      "int_array": [
+       "INTEGERARRAY",
+       "0",
+       false
+      ],
+      "jsonb_obj": [
+       "JSONB",
+       "1",
+       false
+      ],
+      "json_scalar": [
+       "JSON",
+       "1",
+       false
+      ],
+      "raw_bytes": [
+       "BINARY",
+       "None",
+       false
+      ],
+      "ts_offset": [
+       "DATETIMETZ",
+       "2",
+       true
+      ],
+      "ts_far_future": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "all_null": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    }
+   }
+  }
+ },
+ "duckdb": {
+  "bench_table": {
+   "errors": {},
+   "rows_vs_arrow": [
+    {
+     "column": "i32",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dec",
+     "arrow_types": [
+      "decimal128(7, 4)",
+      "decimal128(18, 4)"
+     ]
+    }
+   ],
+   "adbc_rows_vs_arrow": [
+    {
+     "column": "i32",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dec",
+     "arrow_types": [
+      "decimal128(7, 4)",
+      "decimal128(18, 4)"
+     ]
+    }
+   ],
+   "rows_vs_adbc_rows": [],
+   "schemas": {
+    "rows": {
+     "arrow_types": {
+      "id": "int64",
+      "i32": "int64",
+      "f64": "double",
+      "dec": "decimal128(7, 4)",
+      "txt": "string",
+      "ts_tz": "timestamp[us, tz=UTC]",
+      "ts": "timestamp[us]",
+      "d": "date32[day]",
+      "b": "bool",
+      "js": "string",
+      "u": "string"
+     },
+     "columns": {
+      "id": [
+       "INT",
+       "0",
+       false
+      ],
+      "i32": [
+       "INT",
+       "0",
+       false
+      ],
+      "f64": [
+       "FLOAT",
+       "0",
+       false
+      ],
+      "dec": [
+       null,
+       "None",
+       false
+      ],
+      "txt": [
+       "STRING",
+       "1",
+       false
+      ],
+      "ts_tz": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "d": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "b": [
+       "BOOL",
+       "3",
+       false
+      ],
+      "js": [
+       "STRING",
+       "1",
+       false
+      ],
+      "u": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    },
+    "adbc_rows": {
+     "arrow_types": {
+      "id": "int64",
+      "i32": "int64",
+      "f64": "double",
+      "dec": "decimal128(7, 4)",
+      "txt": "string",
+      "ts_tz": "timestamp[us, tz=UTC]",
+      "ts": "timestamp[us]",
+      "d": "date32[day]",
+      "b": "bool",
+      "js": "string",
+      "u": "string"
+     },
+     "columns": {
+      "id": [
+       "INT",
+       "0",
+       false
+      ],
+      "i32": [
+       "INT",
+       "0",
+       false
+      ],
+      "f64": [
+       "FLOAT",
+       "0",
+       false
+      ],
+      "dec": [
+       null,
+       "None",
+       false
+      ],
+      "txt": [
+       "STRING",
+       "1",
+       false
+      ],
+      "ts_tz": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "d": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "b": [
+       "BOOL",
+       "3",
+       false
+      ],
+      "js": [
+       "STRING",
+       "1",
+       false
+      ],
+      "u": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    },
+    "arrow": {
+     "arrow_types": {
+      "id": "int64",
+      "i32": "int32",
+      "f64": "double",
+      "dec": "decimal128(18, 4)",
+      "txt": "string",
+      "ts_tz": "timestamp[us, tz=UTC]",
+      "ts": "timestamp[us]",
+      "d": "date32[day]",
+      "b": "bool",
+      "js": "string",
+      "u": "string"
+     },
+     "columns": {
+      "id": [
+       "INT",
+       "0",
+       false
+      ],
+      "i32": [
+       "INT",
+       "0",
+       false
+      ],
+      "f64": [
+       "FLOAT",
+       "0",
+       false
+      ],
+      "dec": [
+       null,
+       "None",
+       false
+      ],
+      "txt": [
+       "STRING",
+       "1",
+       false
+      ],
+      "ts_tz": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "d": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "b": [
+       "BOOL",
+       "3",
+       false
+      ],
+      "js": [
+       "STRING",
+       "1",
+       false
+      ],
+      "u": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    }
+   }
+  },
+  "edge_cases": {
+   "errors": {},
+   "rows_vs_arrow": [
+    {
+     "column": "dup",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dup__1",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dec_wide",
+     "arrow_types": [
+      "decimal128(22, 4)",
+      "decimal128(38, 4)"
+     ]
+    },
+    {
+     "column": "iv",
+     "arrow_types": [
+      "duration[us]",
+      "month_day_nano_interval"
+     ],
+     "py_types": [
+      [
+       "Timedelta"
+      ],
+      [
+       "DateOffset"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "Timedelta",
+        "1 days 02:03:04"
+       ],
+       [
+        "DateOffset",
+        "<DateOffset: days=1, months=0, nanoseconds=7384000000000>"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "timedelta",
+        "1 day, 2:03:04"
+       ],
+       [
+        "MonthDayNano",
+        [
+         0,
+         1,
+         7384000000000
+        ]
+       ]
+      ]
+     }
+    },
+    {
+     "column": "all_null",
+     "arrow_types": [
+      "null",
+      "string"
+     ],
+     "columns": [
+      [
+       null,
+       "None",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ]
+    }
+   ],
+   "adbc_rows_vs_arrow": [
+    {
+     "column": "dup",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dup__1",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dec_wide",
+     "arrow_types": [
+      "decimal128(22, 4)",
+      "decimal128(38, 4)"
+     ]
+    },
+    {
+     "column": "all_null",
+     "arrow_types": [
+      "null",
+      "string"
+     ],
+     "columns": [
+      [
+       null,
+       "None",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ]
+    }
+   ],
+   "rows_vs_adbc_rows": [
+    {
+     "column": "iv",
+     "arrow_types": [
+      "duration[us]",
+      "month_day_nano_interval"
+     ],
+     "py_types": [
+      [
+       "Timedelta"
+      ],
+      [
+       "DateOffset"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "Timedelta",
+        "1 days 02:03:04"
+       ],
+       [
+        "DateOffset",
+        "<DateOffset: days=1, months=0, nanoseconds=7384000000000>"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "timedelta",
+        "1 day, 2:03:04"
+       ],
+       [
+        "MonthDayNano",
+        [
+         0,
+         1,
+         7384000000000
+        ]
+       ]
+      ]
+     }
+    }
+   ],
+   "schemas": {
+    "rows": {
+     "arrow_types": {
+      "dup": "int64",
+      "dup__1": "int64",
+      "dec_wide": "decimal128(22, 4)",
+      "iv": "duration[us]",
+      "int_list": "string",
+      "struct_col": "string",
+      "enum_col": "string",
+      "json_scalar": "string",
+      "raw_bytes": "binary",
+      "ts_offset": "timestamp[us, tz=UTC]",
+      "ts_far_future": "timestamp[us]",
+      "all_null": "null"
+     },
+     "columns": {
+      "dup": [
+       "INT",
+       "0",
+       false
+      ],
+      "dup__1": [
+       "INT",
+       "0",
+       false
+      ],
+      "dec_wide": [
+       null,
+       "None",
+       false
+      ],
+      "iv": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "int_list": [
+       "STRING",
+       "1",
+       false
+      ],
+      "struct_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "enum_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "json_scalar": [
+       "STRING",
+       "1",
+       false
+      ],
+      "raw_bytes": [
+       null,
+       "None",
+       false
+      ],
+      "ts_offset": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts_far_future": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "all_null": [
+       null,
+       "None",
+       false
+      ]
+     }
+    },
+    "adbc_rows": {
+     "arrow_types": {
+      "dup": "int64",
+      "dup__1": "int64",
+      "dec_wide": "decimal128(22, 4)",
+      "iv": "month_day_nano_interval",
+      "int_list": "string",
+      "struct_col": "string",
+      "enum_col": "string",
+      "json_scalar": "string",
+      "raw_bytes": "binary",
+      "ts_offset": "timestamp[us, tz=UTC]",
+      "ts_far_future": "timestamp[us]",
+      "all_null": "null"
+     },
+     "columns": {
+      "dup": [
+       "INT",
+       "0",
+       false
+      ],
+      "dup__1": [
+       "INT",
+       "0",
+       false
+      ],
+      "dec_wide": [
+       null,
+       "None",
+       false
+      ],
+      "iv": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "int_list": [
+       "STRING",
+       "1",
+       false
+      ],
+      "struct_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "enum_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "json_scalar": [
+       "STRING",
+       "1",
+       false
+      ],
+      "raw_bytes": [
+       null,
+       "None",
+       false
+      ],
+      "ts_offset": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts_far_future": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "all_null": [
+       null,
+       "None",
+       false
+      ]
+     }
+    },
+    "arrow": {
+     "arrow_types": {
+      "dup": "int32",
+      "dup__1": "int32",
+      "dec_wide": "decimal128(38, 4)",
+      "iv": "month_day_nano_interval",
+      "int_list": "string",
+      "struct_col": "string",
+      "enum_col": "string",
+      "json_scalar": "string",
+      "raw_bytes": "binary",
+      "ts_offset": "timestamp[us, tz=UTC]",
+      "ts_far_future": "timestamp[us]",
+      "all_null": "string"
+     },
+     "columns": {
+      "dup": [
+       "INT",
+       "0",
+       false
+      ],
+      "dup__1": [
+       "INT",
+       "0",
+       false
+      ],
+      "dec_wide": [
+       null,
+       "None",
+       false
+      ],
+      "iv": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "int_list": [
+       "STRING",
+       "1",
+       false
+      ],
+      "struct_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "enum_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "json_scalar": [
+       "STRING",
+       "1",
+       false
+      ],
+      "raw_bytes": [
+       null,
+       "None",
+       false
+      ],
+      "ts_offset": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts_far_future": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "all_null": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    }
+   }
+  }
+ },
+ "flightsql": {
+  "bench_table": {
+   "errors": {},
+   "rows_vs_arrow": [
+    {
+     "column": "i32",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dec",
+     "arrow_types": [
+      "decimal128(7, 4)",
+      "decimal128(18, 4)"
+     ]
+    },
+    {
+     "column": "d",
+     "arrow_types": [
+      "timestamp[us]",
+      "date32[day]"
+     ],
+     "py_types": [
+      [
+       "Timestamp"
+      ],
+      [
+       "date"
+      ]
+     ],
+     "values": {
+      "n_diff": 1000,
+      "example": [
+       [
+        "naive",
+        "2020-01-02T00:00:00"
+       ],
+       [
+        "date",
+        "2020-01-02"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1000,
+      "example": [
+       [
+        "naive",
+        "2020-01-02T00:00:00"
+       ],
+       [
+        "date",
+        "2020-01-02"
+       ]
+      ]
+     }
+    }
+   ],
+   "adbc_rows_vs_arrow": [
+    {
+     "column": "i32",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dec",
+     "arrow_types": [
+      "decimal128(7, 4)",
+      "decimal128(18, 4)"
+     ]
+    }
+   ],
+   "rows_vs_adbc_rows": [
+    {
+     "column": "d",
+     "arrow_types": [
+      "timestamp[us]",
+      "date32[day]"
+     ],
+     "py_types": [
+      [
+       "Timestamp"
+      ],
+      [
+       "date"
+      ]
+     ],
+     "values": {
+      "n_diff": 1000,
+      "example": [
+       [
+        "naive",
+        "2020-01-02T00:00:00"
+       ],
+       [
+        "date",
+        "2020-01-02"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1000,
+      "example": [
+       [
+        "naive",
+        "2020-01-02T00:00:00"
+       ],
+       [
+        "date",
+        "2020-01-02"
+       ]
+      ]
+     }
+    }
+   ],
+   "schemas": {
+    "rows": {
+     "arrow_types": {
+      "id": "int64",
+      "i32": "int64",
+      "f64": "double",
+      "dec": "decimal128(7, 4)",
+      "txt": "string",
+      "ts_tz": "timestamp[us, tz=Etc/UTC]",
+      "ts": "timestamp[us]",
+      "d": "timestamp[us]",
+      "b": "bool",
+      "js": "string",
+      "u": "string"
+     },
+     "columns": {
+      "id": [
+       "INT",
+       "0",
+       false
+      ],
+      "i32": [
+       "INT",
+       "0",
+       false
+      ],
+      "f64": [
+       "FLOAT",
+       "0",
+       false
+      ],
+      "dec": [
+       null,
+       "None",
+       false
+      ],
+      "txt": [
+       "STRING",
+       "1",
+       false
+      ],
+      "ts_tz": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "d": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "b": [
+       "BOOL",
+       "3",
+       false
+      ],
+      "js": [
+       "STRING",
+       "1",
+       false
+      ],
+      "u": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    },
+    "adbc_rows": {
+     "arrow_types": {
+      "id": "int64",
+      "i32": "int64",
+      "f64": "double",
+      "dec": "decimal128(7, 4)",
+      "txt": "string",
+      "ts_tz": "timestamp[us, tz=Etc/UTC]",
+      "ts": "timestamp[us]",
+      "d": "date32[day]",
+      "b": "bool",
+      "js": "string",
+      "u": "string"
+     },
+     "columns": {
+      "id": [
+       "INT",
+       "0",
+       false
+      ],
+      "i32": [
+       "INT",
+       "0",
+       false
+      ],
+      "f64": [
+       "FLOAT",
+       "0",
+       false
+      ],
+      "dec": [
+       null,
+       "None",
+       false
+      ],
+      "txt": [
+       "STRING",
+       "1",
+       false
+      ],
+      "ts_tz": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "d": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "b": [
+       "BOOL",
+       "3",
+       false
+      ],
+      "js": [
+       "STRING",
+       "1",
+       false
+      ],
+      "u": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    },
+    "arrow": {
+     "arrow_types": {
+      "id": "int64",
+      "i32": "int32",
+      "f64": "double",
+      "dec": "decimal128(18, 4)",
+      "txt": "string",
+      "ts_tz": "timestamp[us, tz=Etc/UTC]",
+      "ts": "timestamp[us]",
+      "d": "date32[day]",
+      "b": "bool",
+      "js": "string",
+      "u": "string"
+     },
+     "columns": {
+      "id": [
+       "INT",
+       "0",
+       false
+      ],
+      "i32": [
+       "INT",
+       "0",
+       false
+      ],
+      "f64": [
+       "FLOAT",
+       "0",
+       false
+      ],
+      "dec": [
+       null,
+       "None",
+       false
+      ],
+      "txt": [
+       "STRING",
+       "1",
+       false
+      ],
+      "ts_tz": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "d": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "b": [
+       "BOOL",
+       "3",
+       false
+      ],
+      "js": [
+       "STRING",
+       "1",
+       false
+      ],
+      "u": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    }
+   }
+  },
+  "edge_cases": {
+   "errors": {},
+   "rows_vs_arrow": [
+    {
+     "column": "dup",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dup__1",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dec_wide",
+     "arrow_types": [
+      "decimal128(22, 4)",
+      "decimal128(38, 4)"
+     ]
+    },
+    {
+     "column": "int_list",
+     "py_types": [
+      [
+       "ndarray"
+      ],
+      [
+       "list"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "ndarray",
+        "[1, 2, null]"
+       ],
+       [
+        "json",
+        "[1, 2, null]"
+       ]
+      ]
+     }
+    },
+    {
+     "column": "all_null",
+     "arrow_types": [
+      "double",
+      "string"
+     ],
+     "columns": [
+      [
+       "FLOAT",
+       "0",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ]
+    }
+   ],
+   "adbc_rows_vs_arrow": [
+    {
+     "column": "dup",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dup__1",
+     "arrow_types": [
+      "int64",
+      "int32"
+     ]
+    },
+    {
+     "column": "dec_wide",
+     "arrow_types": [
+      "decimal128(22, 4)",
+      "decimal128(38, 4)"
+     ]
+    },
+    {
+     "column": "all_null",
+     "arrow_types": [
+      "null",
+      "string"
+     ],
+     "columns": [
+      [
+       null,
+       "None",
+       false
+      ],
+      [
+       "STRING",
+       "1",
+       false
+      ]
+     ]
+    }
+   ],
+   "rows_vs_adbc_rows": [
+    {
+     "column": "int_list",
+     "py_types": [
+      [
+       "ndarray"
+      ],
+      [
+       "list"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "ndarray",
+        "[1, 2, null]"
+       ],
+       [
+        "json",
+        "[1, 2, null]"
+       ]
+      ]
+     }
+    },
+    {
+     "column": "all_null",
+     "arrow_types": [
+      "double",
+      "null"
+     ],
+     "columns": [
+      [
+       "FLOAT",
+       "0",
+       false
+      ],
+      [
+       null,
+       "None",
+       false
+      ]
+     ]
+    }
+   ],
+   "schemas": {
+    "rows": {
+     "arrow_types": {
+      "dup": "int64",
+      "dup__1": "int64",
+      "dec_wide": "decimal128(22, 4)",
+      "iv": "month_day_nano_interval",
+      "int_list": "string",
+      "struct_col": "string",
+      "enum_col": "string",
+      "json_scalar": "string",
+      "raw_bytes": "binary",
+      "ts_offset": "timestamp[us, tz=Etc/UTC]",
+      "ts_far_future": "timestamp[us]",
+      "all_null": "double"
+     },
+     "columns": {
+      "dup": [
+       "INT",
+       "0",
+       false
+      ],
+      "dup__1": [
+       "INT",
+       "0",
+       false
+      ],
+      "dec_wide": [
+       null,
+       "None",
+       false
+      ],
+      "iv": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "int_list": [
+       "STRING",
+       "1",
+       false
+      ],
+      "struct_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "enum_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "json_scalar": [
+       "STRING",
+       "1",
+       false
+      ],
+      "raw_bytes": [
+       null,
+       "None",
+       false
+      ],
+      "ts_offset": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts_far_future": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "all_null": [
+       "FLOAT",
+       "0",
+       false
+      ]
+     }
+    },
+    "adbc_rows": {
+     "arrow_types": {
+      "dup": "int64",
+      "dup__1": "int64",
+      "dec_wide": "decimal128(22, 4)",
+      "iv": "month_day_nano_interval",
+      "int_list": "string",
+      "struct_col": "string",
+      "enum_col": "string",
+      "json_scalar": "string",
+      "raw_bytes": "binary",
+      "ts_offset": "timestamp[us, tz=Etc/UTC]",
+      "ts_far_future": "timestamp[us]",
+      "all_null": "null"
+     },
+     "columns": {
+      "dup": [
+       "INT",
+       "0",
+       false
+      ],
+      "dup__1": [
+       "INT",
+       "0",
+       false
+      ],
+      "dec_wide": [
+       null,
+       "None",
+       false
+      ],
+      "iv": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "int_list": [
+       "STRING",
+       "1",
+       false
+      ],
+      "struct_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "enum_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "json_scalar": [
+       "STRING",
+       "1",
+       false
+      ],
+      "raw_bytes": [
+       null,
+       "None",
+       false
+      ],
+      "ts_offset": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts_far_future": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "all_null": [
+       null,
+       "None",
+       false
+      ]
+     }
+    },
+    "arrow": {
+     "arrow_types": {
+      "dup": "int32",
+      "dup__1": "int32",
+      "dec_wide": "decimal128(38, 4)",
+      "iv": "month_day_nano_interval",
+      "int_list": "string",
+      "struct_col": "string",
+      "enum_col": "string",
+      "json_scalar": "string",
+      "raw_bytes": "binary",
+      "ts_offset": "timestamp[us, tz=Etc/UTC]",
+      "ts_far_future": "timestamp[us]",
+      "all_null": "string"
+     },
+     "columns": {
+      "dup": [
+       "INT",
+       "0",
+       false
+      ],
+      "dup__1": [
+       "INT",
+       "0",
+       false
+      ],
+      "dec_wide": [
+       null,
+       "None",
+       false
+      ],
+      "iv": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "int_list": [
+       "STRING",
+       "1",
+       false
+      ],
+      "struct_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "enum_col": [
+       "STRING",
+       "1",
+       false
+      ],
+      "json_scalar": [
+       "STRING",
+       "1",
+       false
+      ],
+      "raw_bytes": [
+       null,
+       "None",
+       false
+      ],
+      "ts_offset": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "ts_far_future": [
+       "DATETIME",
+       "2",
+       true
+      ],
+      "all_null": [
+       "STRING",
+       "1",
+       false
+      ]
+     }
+    }
+   }
+  }
+ }
+}

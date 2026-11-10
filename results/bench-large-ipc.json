@@ -1,0 +1,378 @@
+{
+ "started_utc": "2026-11-10T08:06:20.446885+00:00",
+ "finished_utc": "2026-11-10T08:07:24.969247+00:00",
+ "env": {
+  "python": "3.11.17",
+  "platform": "Linux-6.12.113+-x86_64-with-glibc2.41",
+  "apache-superset": "0.0.0.dev0",
+  "pyarrow": "26.0.1",
+  "pandas": "3.1.1",
+  "numpy": "2.4.6",
+  "sqlalchemy": "2.0.57",
+  "duckdb": "1.5.6",
+  "duckdb-engine": "0.17.0",
+  "psycopg2-binary": "2.9.13",
+  "adbc-driver-manager": "1.13.0",
+  "adbc-driver-postgresql": "1.13.0",
+  "adbc-driver-flightsql": "1.13.0",
+  "flightsql-dbapi": "0.2.2",
+  "superset_commit": "a131fcb623d88ed9eb7e7a414e226437423d645c",
+  "cpu": "Intel(R) Xeon(R) Processor",
+  "cpu_count": 8,
+  "mem_total_gb": 15.6,
+  "docker_images": [
+   "/sab-postgres postgres:17.6 sha256:50903ccdcab597707a1f61c7ae016a06b0b548da53a6f7ad716d56b072bedba0",
+   "/sab-flightsql sab-flightsql:gizmosql-1.42.2-json sha256:904b5882e073441855f7a51212819bba1791b00cfaa8950f36de2af08a0cc015"
+  ]
+ },
+ "args": {
+  "rows": [
+   1000000,
+   10000000
+  ],
+  "rounds": [
+   3,
+   3
+  ],
+  "backends": [
+   "postgres",
+   "duckdb",
+   "flightsql"
+  ],
+  "paths": [
+   "arrow"
+  ],
+  "max_rss_gb": 5.0,
+  "timeout": 1800,
+  "out": "results/bench-large-ipc.json",
+  "downstream": "ipc"
+ },
+ "results": [
+  {
+   "backend": "postgres",
+   "path": "arrow",
+   "rows": 1000000,
+   "rounds": 3,
+   "downstream": "ipc",
+   "fetch_s": {
+    "median": 1.1720237089994043,
+    "min": 1.1019783170013397,
+    "max": 1.1778311950001807
+   },
+   "result_set_s": {
+    "median": 0.34468340999956126,
+    "min": 0.33372378000058234,
+    "max": 0.3820458209993376
+   },
+   "ipc_s": {
+    "median": 0.25686950999988767,
+    "min": 0.25171733199931623,
+    "max": 0.2857697780000308
+   },
+   "pandas_s": null,
+   "total_ipc_s": {
+    "median": 1.757464820999303,
+    "min": 1.740893648000565,
+    "max": 1.8082843829997728
+   },
+   "total_pandas_s": null,
+   "peak_rss_delta_bytes_median": 636891136,
+   "arrow_pool_peak_bytes_median": 324699904,
+   "tracemalloc_peak_bytes": 11709935,
+   "ipc_bytes": 141181664,
+   "n_rows_out": 1000000,
+   "raw": [
+    {
+     "backend": "postgres",
+     "path": "arrow",
+     "rows": 1000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 1000000,
+     "n_cols": 11,
+     "fetch_s": 1.1019783170013397,
+     "result_set_s": 0.3820458209993376,
+     "ipc_s": 0.25686950999988767,
+     "pandas_s": null,
+     "total_ipc_s": 1.740893648000565,
+     "total_pandas_s": null,
+     "ipc_bytes": 141181664,
+     "rss_baseline_bytes": 319819776,
+     "peak_rss_delta_bytes": 628334592,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 324699904,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "postgres",
+     "path": "arrow",
+     "rows": 1000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 1000000,
+     "n_cols": 11,
+     "fetch_s": 1.1778311950001807,
+     "result_set_s": 0.34468340999956126,
+     "ipc_s": 0.2857697780000308,
+     "pandas_s": null,
+     "total_ipc_s": 1.8082843829997728,
+     "total_pandas_s": null,
+     "ipc_bytes": 141181664,
+     "rss_baseline_bytes": 319819776,
+     "peak_rss_delta_bytes": 636911616,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 324699904,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "postgres",
+     "path": "arrow",
+     "rows": 1000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 1000000,
+     "n_cols": 11,
+     "fetch_s": 1.1720237089994043,
+     "result_set_s": 0.33372378000058234,
+     "ipc_s": 0.25171733199931623,
+     "pandas_s": null,
+     "total_ipc_s": 1.757464820999303,
+     "total_pandas_s": null,
+     "ipc_bytes": 141181664,
+     "rss_baseline_bytes": 319967232,
+     "peak_rss_delta_bytes": 636891136,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 324699904,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    }
+   ]
+  },
+  {
+   "backend": "duckdb",
+   "path": "arrow",
+   "rows": 1000000,
+   "rounds": 3,
+   "downstream": "ipc",
+   "fetch_s": {
+    "median": 0.2913752389995352,
+    "min": 0.27307313500023156,
+    "max": 0.2991226499998447
+   },
+   "result_set_s": {
+    "median": 0.0004632660002243938,
+    "min": 0.00041109000085270964,
+    "max": 0.0004798680001840694
+   },
+   "ipc_s": {
+    "median": 0.16797144900010608,
+    "min": 0.16099385999950755,
+    "max": 0.3542756480001117
+   },
+   "pandas_s": null,
+   "total_ipc_s": {
+    "median": 0.4675573650001752,
+    "min": 0.45278018899989547,
+    "max": 0.6278286510005273
+   },
+   "total_pandas_s": null,
+   "peak_rss_delta_bytes_median": 779325440,
+   "arrow_pool_peak_bytes_median": 268436160,
+   "tracemalloc_peak_bytes": 18232,
+   "ipc_bytes": 134919088,
+   "n_rows_out": 1000000,
+   "raw": [
+    {
+     "backend": "duckdb",
+     "path": "arrow",
+     "rows": 1000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 1000000,
+     "n_cols": 11,
+     "fetch_s": 0.27307313500023156,
+     "result_set_s": 0.0004798680001840694,
+     "ipc_s": 0.3542756480001117,
+     "pandas_s": null,
+     "total_ipc_s": 0.6278286510005273,
+     "total_pandas_s": null,
+     "ipc_bytes": 134919088,
+     "rss_baseline_bytes": 344301568,
+     "peak_rss_delta_bytes": 779325440,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 268436160,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "duckdb",
+     "path": "arrow",
+     "rows": 1000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 1000000,
+     "n_cols": 11,
+     "fetch_s": 0.2991226499998447,
+     "result_set_s": 0.0004632660002243938,
+     "ipc_s": 0.16797144900010608,
+     "pandas_s": null,
+     "total_ipc_s": 0.4675573650001752,
+     "total_pandas_s": null,
+     "ipc_bytes": 134919088,
+     "rss_baseline_bytes": 344412160,
+     "peak_rss_delta_bytes": 783007744,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 268436160,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "duckdb",
+     "path": "arrow",
+     "rows": 1000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 1000000,
+     "n_cols": 11,
+     "fetch_s": 0.2913752389995352,
+     "result_set_s": 0.00041109000085270964,
+     "ipc_s": 0.16099385999950755,
+     "pandas_s": null,
+     "total_ipc_s": 0.45278018899989547,
+     "total_pandas_s": null,
+     "ipc_bytes": 134919088,
+     "rss_baseline_bytes": 344662016,
+     "peak_rss_delta_bytes": 779177984,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 268436160,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    }
+   ]
+  },
+  {
+   "backend": "flightsql",
+   "path": "arrow",
+   "rows": 1000000,
+   "rounds": 3,
+   "downstream": "ipc",
+   "fetch_s": {
+    "median": 0.25743972300006135,
+    "min": 0.24320321300001524,
+    "max": 0.270008018000226
+   },
+   "result_set_s": {
+    "median": 0.00043410699981905054,
+    "min": 0.000399009999455302,
+    "max": 0.0004436960007296875
+   },
+   "ipc_s": {
+    "median": 0.24201678299868945,
+    "min": 0.20879554500061204,
+    "max": 0.2684571939989837
+   },
+   "pandas_s": null,
+   "total_ipc_s": {
+    "median": 0.4999002019994805,
+    "min": 0.47920257300029334,
+    "max": 0.512094513998818
+   },
+   "total_pandas_s": null,
+   "peak_rss_delta_bytes_median": 572493824,
+   "arrow_pool_peak_bytes_median": 268436160,
+   "tracemalloc_peak_bytes": 18464,
+   "ipc_bytes": 134919088,
+   "n_rows_out": 1000000,
+   "raw": [
+    {
+     "backend": "flightsql",
+     "path": "arrow",
+     "rows": 1000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 1000000,
+     "n_cols": 11,
+     "fetch_s": 0.24320321300001524,
+     "result_set_s": 0.00043410699981905054,
+     "ipc_s": 0.2684571939989837,
+     "pandas_s": null,
+     "total_ipc_s": 0.512094513998818,
+     "total_pandas_s": null,
+     "ipc_bytes": 134919088,
+     "rss_baseline_bytes": 334708736,
+     "peak_rss_delta_bytes": 574578688,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 268436160,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "flightsql",
+     "path": "arrow",
+     "rows": 1000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 1000000,
+     "n_cols": 11,
+     "fetch_s": 0.25743972300006135,
+     "result_set_s": 0.0004436960007296875,
+     "ipc_s": 0.24201678299868945,
+     "pandas_s": null,
+     "total_ipc_s": 0.4999002019994805,
+     "total_pandas_s": null,
+     "ipc_bytes": 134919088,
+     "rss_baseline_bytes": 335073280,
+     "peak_rss_delta_bytes": 572493824,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 268436160,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    },
+    {
+     "backend": "flightsql",
+     "path": "arrow",
+     "rows": 1000000,
+     "mode": "time",
+     "downstream": "ipc",
+     "n_rows_out": 1000000,
+     "n_cols": 11,
+     "fetch_s": 0.270008018000226,
+     "result_set_s": 0.000399009999455302,
+     "ipc_s": 0.20879554500061204,
+     "pandas_s": null,
+     "total_ipc_s": 0.47920257300029334,
+     "total_pandas_s": null,
+     "ipc_bytes": 134919088,
+     "rss_baseline_bytes": 334819328,
+     "peak_rss_delta_bytes": 571215872,
+     "peak_rss_reset_ok": true,
+     "arrow_pool_peak_bytes": 268436160,
+     "arrow_pool_backend": "mimalloc",
+     "arrow_pool_baseline_bytes": 0
+    }
+   ]
+  }
+ ],
+ "skipped": [
+  {
+   "backend": "postgres",
+   "path": "arrow",
+   "rows": 10000000,
+   "reason": "estimated peak RSS 5.9 GiB > --max-rss-gb 5.0"
+  },
+  {
+   "backend": "duckdb",
+   "path": "arrow",
+   "rows": 10000000,
+   "reason": "estimated peak RSS 7.3 GiB > --max-rss-gb 5.0"
+  },
+  {
+   "backend": "flightsql",
+   "path": "arrow",
+   "rows": 10000000,
+   "reason": "estimated peak RSS 5.3 GiB > --max-rss-gb 5.0"
+  }
+ ]
+}
