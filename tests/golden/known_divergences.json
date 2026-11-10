@@ -1,0 +1,201 @@
+{
+ "duckdb/bench_table/adbc_rows_vs_arrow/dec": [
+  "arrow_types"
+ ],
+ "duckdb/bench_table/adbc_rows_vs_arrow/i32": [
+  "arrow_types"
+ ],
+ "duckdb/bench_table/rows_vs_arrow/dec": [
+  "arrow_types"
+ ],
+ "duckdb/bench_table/rows_vs_arrow/i32": [
+  "arrow_types"
+ ],
+ "duckdb/edge_cases/adbc_rows_vs_arrow/all_null": [
+  "arrow_types",
+  "columns"
+ ],
+ "duckdb/edge_cases/adbc_rows_vs_arrow/dec_wide": [
+  "arrow_types"
+ ],
+ "duckdb/edge_cases/adbc_rows_vs_arrow/dup": [
+  "arrow_types"
+ ],
+ "duckdb/edge_cases/adbc_rows_vs_arrow/dup__1": [
+  "arrow_types"
+ ],
+ "duckdb/edge_cases/rows_vs_arrow/all_null": [
+  "arrow_types",
+  "columns"
+ ],
+ "duckdb/edge_cases/rows_vs_arrow/dec_wide": [
+  "arrow_types"
+ ],
+ "duckdb/edge_cases/rows_vs_arrow/dup": [
+  "arrow_types"
+ ],
+ "duckdb/edge_cases/rows_vs_arrow/dup__1": [
+  "arrow_types"
+ ],
+ "duckdb/edge_cases/rows_vs_arrow/iv": [
+  "arrow_types",
+  "ipc_values",
+  "py_types",
+  "values"
+ ],
+ "flightsql/bench_table/adbc_rows_vs_arrow/dec": [
+  "arrow_types"
+ ],
+ "flightsql/bench_table/adbc_rows_vs_arrow/i32": [
+  "arrow_types"
+ ],
+ "flightsql/bench_table/rows_vs_arrow/d": [
+  "arrow_types",
+  "ipc_values",
+  "py_types",
+  "values"
+ ],
+ "flightsql/bench_table/rows_vs_arrow/dec": [
+  "arrow_types"
+ ],
+ "flightsql/bench_table/rows_vs_arrow/i32": [
+  "arrow_types"
+ ],
+ "flightsql/edge_cases/adbc_rows_vs_arrow/all_null": [
+  "arrow_types",
+  "columns"
+ ],
+ "flightsql/edge_cases/adbc_rows_vs_arrow/dec_wide": [
+  "arrow_types"
+ ],
+ "flightsql/edge_cases/adbc_rows_vs_arrow/dup": [
+  "arrow_types"
+ ],
+ "flightsql/edge_cases/adbc_rows_vs_arrow/dup__1": [
+  "arrow_types"
+ ],
+ "flightsql/edge_cases/rows_vs_arrow/all_null": [
+  "arrow_types",
+  "columns"
+ ],
+ "flightsql/edge_cases/rows_vs_arrow/dec_wide": [
+  "arrow_types"
+ ],
+ "flightsql/edge_cases/rows_vs_arrow/dup": [
+  "arrow_types"
+ ],
+ "flightsql/edge_cases/rows_vs_arrow/dup__1": [
+  "arrow_types"
+ ],
+ "flightsql/edge_cases/rows_vs_arrow/int_list": [
+  "py_types",
+  "values"
+ ],
+ "postgres/bench_table/adbc_rows_vs_arrow/b": [
+  "columns"
+ ],
+ "postgres/bench_table/adbc_rows_vs_arrow/d": [
+  "columns"
+ ],
+ "postgres/bench_table/adbc_rows_vs_arrow/dec": [
+  "arrow_types",
+  "columns",
+  "ipc_values"
+ ],
+ "postgres/bench_table/adbc_rows_vs_arrow/i32": [
+  "arrow_types",
+  "columns"
+ ],
+ "postgres/bench_table/adbc_rows_vs_arrow/id": [
+  "columns"
+ ],
+ "postgres/bench_table/adbc_rows_vs_arrow/js": [
+  "columns",
+  "nested_columns",
+  "py_types",
+  "values"
+ ],
+ "postgres/bench_table/adbc_rows_vs_arrow/ts_tz": [
+  "columns"
+ ],
+ "postgres/bench_table/rows_vs_arrow/dec": [
+  "arrow_types"
+ ],
+ "postgres/bench_table/rows_vs_arrow/i32": [
+  "arrow_types"
+ ],
+ "postgres/bench_table/rows_vs_arrow/js": [
+  "ipc_values"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/all_null": [
+  "arrow_types",
+  "columns"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/dup": [
+  "arrow_types",
+  "columns"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/dup__1": [
+  "arrow_types",
+  "columns"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/int_array": [
+  "columns"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/iv": [
+  "columns"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/json_scalar": [
+  "columns"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/jsonb_obj": [
+  "columns",
+  "nested_columns",
+  "py_types",
+  "values"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/numeric_nan": [
+  "columns",
+  "ipc_values",
+  "py_types",
+  "values"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/numeric_wide": [
+  "arrow_types",
+  "columns",
+  "ipc_values"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/raw_bytes": [
+  "columns"
+ ],
+ "postgres/edge_cases/adbc_rows_vs_arrow/ts_offset": [
+  "columns"
+ ],
+ "postgres/edge_cases/rows_vs_arrow/all_null": [
+  "arrow_types"
+ ],
+ "postgres/edge_cases/rows_vs_arrow/dup": [
+  "arrow_types"
+ ],
+ "postgres/edge_cases/rows_vs_arrow/dup__1": [
+  "arrow_types"
+ ],
+ "postgres/edge_cases/rows_vs_arrow/iv": [
+  "arrow_types",
+  "ipc_values",
+  "py_types",
+  "values"
+ ],
+ "postgres/edge_cases/rows_vs_arrow/json_scalar": [
+  "arrow_types",
+  "ipc_values",
+  "py_types",
+  "values"
+ ],
+ "postgres/edge_cases/rows_vs_arrow/numeric_nan": [
+  "arrow_types"
+ ],
+ "postgres/edge_cases/rows_vs_arrow/numeric_wide": [
+  "arrow_types"
+ ]
+}
