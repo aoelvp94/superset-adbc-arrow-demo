@@ -1,0 +1,29 @@
+{
+ "version": "0.2.2",
+ "requires_dist": [
+  "protobuf>=4.21.0",
+  "pyarrow>=14.0.1",
+  "sqlalchemy<2.0",
+  "build; extra == \"dev\"",
+  "flightsql-dbapi[lint,test]; extra == \"dev\"",
+  "pdoc; extra == \"dev\"",
+  "black; extra == \"lint\"",
+  "flake8; extra == \"lint\"",
+  "isort>5.10.0; extra == \"lint\"",
+  "mypy>1.5.0; extra == \"lint\"",
+  "pyproject-flake8; extra == \"lint\"",
+  "toml-cli; extra == \"lint\"",
+  "types-protobuf; extra == \"lint\"",
+  "pandas>2.0; extra == \"test\"",
+  "pytest; extra == \"test\"",
+  "pytest-cov[all]; extra == \"test\""
+ ],
+ "requires_python": ">=3.8",
+ "releases": {
+  "0.1.0": "2023-01-24T04:04:33",
+  "0.1.1": "2023-01-24T04:42:09",
+  "0.2.0": "2023-01-30T15:28:00",
+  "0.2.1": "2023-02-15T15:17:42",
+  "0.2.2": "2024-09-25T16:52:11"
+ }
+}

@@ -1,0 +1,4 @@
+error: No solution found when resolving dependencies
+  cause: Because flightsql-dbapi>=0.2.2 depends on sqlalchemy<2.0 and apache-superset depends on sqlalchemy>=2.0.55,<2.1, we can conclude that your requirements and flightsql-dbapi>=0.2.2 are incompatible.
+         And because apache-superset depends on flightsql-dbapi>=0.2.2, we can conclude that your requirements are unsatisfiable.
+exit=1

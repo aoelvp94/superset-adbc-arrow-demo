@@ -1,0 +1,35 @@
+# Local-only services for the benchmark. No credentials leave this machine.
+name: superset-adbc-arrow-bench
+services:
+  postgres:
+    image: postgres:17.6
+    container_name: sab-postgres
+    environment:
+      POSTGRES_USER: bench
+      POSTGRES_PASSWORD: bench
+      POSTGRES_DB: bench
+      TZ: UTC
+      PGTZ: UTC
+    command: ["postgres", "-c", "shared_buffers=512MB", "-c", "timezone=UTC"]
+    ports: ["55442:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bench -d bench"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Arrow Flight SQL server backed by DuckDB (GizmoSQL, formerly sqlflite).
+  flightsql:
+    build: ./docker/flightsql
+    image: sab-flightsql:gizmosql-1.42.2-json
+    container_name: sab-flightsql
+    environment:
+      GIZMOSQL_USERNAME: bench
+      GIZMOSQL_PASSWORD: bench
+      TLS_ENABLED: "0"
+      PRINT_QUERIES: "0"
+      DATABASE_FILENAME: ":memory:"
+      GIZMOSQL_MEMORY_LIMIT: "4GB"
+      INIT_SQL_COMMANDS: "SET TimeZone='UTC'; LOAD json;"
+    ports: ["31347:31337"]
+

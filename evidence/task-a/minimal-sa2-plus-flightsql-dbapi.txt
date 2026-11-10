@@ -1,0 +1,4 @@
+error: No solution found when resolving dependencies
+  cause: Because flightsql-dbapi>=0.2.2 depends on sqlalchemy<2.0 and you require sqlalchemy>=2.0.55,<2.1, we can conclude that your requirements and flightsql-dbapi>=0.2.2 are incompatible.
+         And because you require flightsql-dbapi>=0.2.2, we can conclude that your requirements are unsatisfiable.
+exit=1

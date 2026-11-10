@@ -1,0 +1,8 @@
+.venv/
+.cache/
+data/
+__pycache__/
+*.pyc
+.pytest_cache/
+results/bench-quick.json
+results/BENCH-quick.md

@@ -1,0 +1,26 @@
+{
+ "version": "0.9.5",
+ "requires_dist": [
+  "adbc-driver-manager>=1.0",
+  "pyarrow>=14.0",
+  "sqlalchemy>=2.0",
+  "adbc-driver-bigquery>=1.0; extra == \"bigquery\"",
+  "adbc-driver-flightsql>=1.0; extra == \"dev\"",
+  "adbc-driver-snowflake>=1.11; extra == \"dev\"",
+  "adbc-driver-sqlite>=1.0; extra == \"dev\"",
+  "alembic>=1.13; extra == \"dev\"",
+  "mypy>=1.10; extra == \"dev\"",
+  "pandas>=2.0; extra == \"dev\"",
+  "pyarrow-stubs>=20; extra == \"dev\"",
+  "pytest-cov>=5.0; extra == \"dev\"",
+  "pytest>=8.0; extra == \"dev\"",
+  "ruff>=0.6; extra == \"dev\"",
+  "tox>=4; extra == \"dev\"",
+  "adbc-driver-flightsql>=1.0; extra == \"flightsql\"",
+  "pyspnego>=0.10; extra == \"kerberos\"",
+  "adbc-driver-postgresql>=1.13.0; extra == \"postgresql\"",
+  "adbc-driver-snowflake>=1.0; extra == \"snowflake\"",
+  "adbc-driver-sqlite>=1.0; extra == \"sqlite\""
+ ],
+ "requires_python": ">=3.12"
+}
