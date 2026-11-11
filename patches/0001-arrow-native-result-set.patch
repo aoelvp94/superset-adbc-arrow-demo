@@ -320,10 +320,115 @@ index 0000000..e78d70e
 +            return f"TIMESTAMP '{rendered}'"
 +        return None
 diff --git a/superset/db_engine_specs/postgres.py b/superset/db_engine_specs/postgres.py
-index 273df33..debaebc 100644
+index 273df33..c4db9d9 100644
 --- a/superset/db_engine_specs/postgres.py
 +++ b/superset/db_engine_specs/postgres.py
-@@ -453,6 +453,11 @@ POSTGRES_TEMPORAL_LITERAL_FORMATS = (
+@@ -20,7 +20,7 @@ from __future__ import annotations
+ import logging
+ import re
+ from collections.abc import Collection
+-from datetime import datetime
++from datetime import datetime, timedelta
+ from re import Pattern
+ from typing import Any, Callable, Optional, TYPE_CHECKING
+ 
+@@ -174,6 +174,95 @@ def _normalize_interval(v: Any) -> Optional[float]:
+     return None
+ 
+ 
++def _timedelta_microseconds(count: int) -> int:
++    """Integer microseconds, truncating toward zero (timedelta's resolution)."""
++    if count >= 0:
++        return count // 1000
++    return -((-count) // 1000)
++
++
++def _month_day_nano_to_timedelta(value: Any) -> timedelta:
++    """
++    Turn an Arrow ``month_day_nano_interval`` into the timedelta psycopg2 builds.
++
++    PostgreSQL stores years inside the month count (12 months = 1 year).
++    psycopg2's text parser then uses 365 days per year and 30 days per month
++    (``typecast_datetime.c``). Splitting the month count the same way makes
++    ``_normalize_interval`` see the timedelta ``fetch_data`` would have mutated.
++    """
++    months = int(value.months)
++    sign = -1 if months < 0 else 1
++    years, leftover_months = divmod(abs(months), 12)
++    extra_days = sign * (years * 365 + leftover_months * 30)
++    return timedelta(
++        days=int(value.days) + extra_days,
++        microseconds=_timedelta_microseconds(int(value.nanoseconds)),
++    )
++
++
++def _duration_value_to_timedelta(value: Any, unit: str) -> timedelta | None:
++    """
++    ``ChunkedArray.to_pylist`` yields a ``timedelta`` for duration columns.
++
++    A raw integer count is accepted too, in the column's unit.
++    """
++    if value is None:
++        return None
++    if isinstance(value, timedelta):
++        return value
++    return _duration_to_timedelta(int(value), unit)
++
++
++def _duration_to_timedelta(count: int, unit: str) -> timedelta:
++    """Duration count to the timedelta a row driver would have returned."""
++    if unit == "s":
++        return timedelta(seconds=count)
++    if unit == "ms":
++        return timedelta(milliseconds=count)
++    if unit == "us":
++        return timedelta(microseconds=count)
++    if unit == "ns":
++        return timedelta(microseconds=_timedelta_microseconds(count))
++    raise ValueError(f"Unsupported duration unit {unit!r}")
++
++
++def _arrow_field_is_postgres_interval(field: Any) -> bool:
++    """
++    Physical types ``fetch_data`` would have turned into a timedelta.
++
++    ``month_day_nano_interval`` is what the ADBC PostgreSQL driver returns.
++    ``duration`` is the same interval when a cursor has already dropped months.
++    A vendor type name of ``interval`` on some other storage (for example
++    text) is left alone: there is no timedelta to mutate.
++    """
++    import pyarrow as pa
++
++    arrow_type = field.type
++    return arrow_type == pa.month_day_nano_interval() or pa.types.is_duration(
++        arrow_type
++    )
++
++
++def _arrow_interval_column_to_milliseconds(field: Any, column: Any) -> Any:
++    """Apply ``_normalize_interval`` to every value. NULL stays NULL."""
++    import pyarrow as pa
++
++    if pa.types.is_duration(field.type):
++        unit = field.type.unit
++        values = [
++            _normalize_interval(_duration_value_to_timedelta(value, unit))
++            for value in column.to_pylist()
++        ]
++    else:
++        values = [
++            _normalize_interval(
++                None if value is None else _month_day_nano_to_timedelta(value)
++            )
++            for value in column.to_pylist()
++        ]
++    return pa.array(values, type=pa.float64())
++
++
+ def _quote_identifier(name: str) -> str:
+     """
+     Quote a Postgres identifier, so it's read exactly as written.
+@@ -453,6 +542,11 @@ POSTGRES_TEMPORAL_LITERAL_FORMATS = (
  
  class PostgresEngineSpec(BasicParametersMixin, PostgresBaseEngineSpec):
      engine = "postgresql"
@@ -335,7 +440,25 @@ index 273df33..debaebc 100644
      engine_name = "PostgreSQL"
      engine_aliases = {"postgres"}
  
-@@ -1167,6 +1172,61 @@ WHERE datistemplate = false;
+@@ -1096,15 +1190,10 @@ class PostgresEngineSpec(BasicParametersMixin, PostgresBaseEngineSpec):
+         In Postgres, a catalog is called a "database".
+         """
+         with inspector.engine.connect() as conn:
+-            return {
+-                catalog
+-                for (catalog,) in conn.execute(
+-                    text("""
++            return {catalog for (catalog,) in conn.execute(text("""
+ SELECT datname FROM pg_database
+ WHERE datistemplate = false;
+-                    """)
+-                )
+-            }
++                    """))}
+ 
+     @classmethod
+     def get_schema_names(cls, inspector: Inspector) -> set[str]:
+@@ -1167,6 +1256,74 @@ WHERE datistemplate = false;
              extra["engine_params"] = engine_params
          return extra
  
@@ -377,6 +500,19 @@ index 273df33..debaebc 100644
 +        "_float8": 1022,
 +        "_numeric": 1231,
 +    }
++
++    @classmethod
++    def normalize_arrow_column(cls, field: Any, column: Any) -> Any:
++        """
++        Match the INTERVAL mutator ``fetch_data`` applies before the row constructor.
++
++        Returns float64 milliseconds, or None when this column is not an interval.
++        ``from_arrow`` calls this only for engine specs that define it. DuckDB
++        intervals are not rewritten here.
++        """
++        if not _arrow_field_is_postgres_interval(field):
++            return None
++        return _arrow_interval_column_to_milliseconds(field, column)
 +
 +    @classmethod
 +    def get_datatype_from_arrow_field(cls, field: Any) -> str | None:
@@ -458,7 +594,7 @@ index 2b56305..583ec79 100755
          if mutator:
              df = mutator(df)
 diff --git a/superset/result_set.py b/superset/result_set.py
-index 3251de7..cb34663 100644
+index 3251de7..2910c31 100644
 --- a/superset/result_set.py
 +++ b/superset/result_set.py
 @@ -24,6 +24,7 @@ from typing import Any, Optional
@@ -469,7 +605,18 @@ index 3251de7..cb34663 100644
  from numpy.typing import NDArray
  
  from superset.db_engine_specs import BaseEngineSpec
-@@ -141,6 +142,91 @@ def stringify_extension_columns(table: pa.Table) -> pa.Table:
+@@ -34,7 +35,9 @@ from superset.utils.core import GenericDataType
+ logger = logging.getLogger(__name__)
+ 
+ 
+-def dedup(l: list[str], suffix: str = "__", case_sensitive: bool = True) -> list[str]:  # noqa: E741
++def dedup(
++    l: list[str], suffix: str = "__", case_sensitive: bool = True
++) -> list[str]:  # noqa: E741
+     """De-duplicates a list of string by suffixing a counter
+ 
+     Always returns the same number of entries as provided, and always returns
+@@ -141,6 +144,91 @@ def stringify_extension_columns(table: pa.Table) -> pa.Table:
      return table
  
  
@@ -561,7 +708,7 @@ index 3251de7..cb34663 100644
  def convert_to_string(value: Any) -> str:
      """
      Used to ensure column names from the cursor description are strings.
-@@ -205,6 +291,8 @@ class SupersetResultSet:
+@@ -205,6 +293,8 @@ class SupersetResultSet:
          stringified_arr: NDArray[Any]
          # Track columns with nested/JSON data to preserve them as objects
          self._nested_columns: dict[str, list[Any]] = {}
@@ -570,7 +717,7 @@ index 3251de7..cb34663 100644
  
          if cursor_description:
              # get deduped list of column names
-@@ -330,6 +418,129 @@ class SupersetResultSet:
+@@ -330,6 +420,137 @@ class SupersetResultSet:
          except Exception as ex:  # pylint: disable=broad-except
              logger.exception(ex)
  
@@ -652,6 +799,14 @@ index 3251de7..cb34663 100644
 +        if pa.types.is_dictionary(field.type):
 +            column = column.cast(field.type.value_type)
 +            field = field.with_type(field.type.value_type)
++        # Engine specs opt in. Postgres rewrites interval/duration to the
++        # milliseconds ``fetch_data`` already produces. Other specs, including
++        # the default, leave the column alone.
++        normalize = getattr(self.db_engine_spec, "normalize_arrow_column", None)
++        if normalize is not None:
++            replaced = normalize(field, column)
++            if replaced is not None:
++                return replaced
 +        if isinstance(field.type, pa.BaseExtensionType):
 +            extension_name = getattr(field.type, "extension_name", "")
 +            if extension_name == "arrow.json":
@@ -700,7 +855,7 @@ index 3251de7..cb34663 100644
      @staticmethod
      def convert_pa_dtype(pa_dtype: pa.DataType) -> Optional[str]:
          if pa.types.is_boolean(pa_dtype):
-@@ -380,6 +591,7 @@ class SupersetResultSet:
+@@ -380,6 +601,7 @@ class SupersetResultSet:
          return self.db_engine_spec.resolve_column_type(set_type, pa_mapped)
  
      def to_pandas_df(self) -> pd.DataFrame:
@@ -708,7 +863,7 @@ index 3251de7..cb34663 100644
          df = self.convert_table_to_df(self.table)
          # Restore nested/JSON columns as Python objects instead of strings
          # This allows JSON data to be used directly in templates like Handlebars.
-@@ -393,6 +605,7 @@ class SupersetResultSet:
+@@ -393,6 +615,7 @@ class SupersetResultSet:
      @property
      def nested_columns(self) -> dict[str, list[Any]]:
          """Original nested values restored by the synchronous DataFrame path."""
@@ -931,10 +1086,10 @@ index 3e619cc..f56ece1 100644
              raise SupersetDisallowedSQLTableException(found_tables)
 diff --git a/tests/unit_tests/result_set_from_arrow_test.py b/tests/unit_tests/result_set_from_arrow_test.py
 new file mode 100644
-index 0000000..f974820
+index 0000000..de7d684
 --- /dev/null
 +++ b/tests/unit_tests/result_set_from_arrow_test.py
-@@ -0,0 +1,528 @@
+@@ -0,0 +1,575 @@
 +# Licensed to the Apache Software Foundation (ASF) under one
 +# or more contributor license agreements.  See the NOTICE file
 +# distributed with this work for additional information
@@ -1173,8 +1328,8 @@ index 0000000..f974820
 +
 +def test_duration_is_not_rewritten_like_the_postgres_interval_mutator() -> None:
 +    """
-+    Postgres turns timedelta intervals into milliseconds inside ``fetch_data``,
-+    before the row constructor. ``from_arrow`` does not apply that mutator.
++    The Postgres mutator is not the default. ``BaseEngineSpec`` leaves a
++    duration column as a duration. ``PostgresEngineSpec`` is tested separately.
 +    """
 +    table = pa.table({"iv": pa.array([1_000_000], type=pa.duration("us"))})
 +    arrow_rs = SupersetResultSet.from_arrow(table, BaseEngineSpec)
@@ -1185,6 +1340,53 @@ index 0000000..f974820
 +        arrow_rs.pa_table.column("iv").to_pylist()
 +        != row_rs.pa_table.column("iv").to_pylist()
 +    )
++
++
++def test_postgres_interval_matches_the_fetch_data_mutator() -> None:
++    """
++    ``1 day 02:03:04`` is 93784000.0 ms on the row path. A year is 365 days
++    and a month is 30, which is how psycopg2 builds the timedelta
++    ``fetch_data`` mutates. DuckDB does not get that rewrite.
++    """
++    from superset.db_engine_specs.postgres import _normalize_interval
++
++    nanos = (2 * 3600 + 3 * 60 + 4) * 1_000_000_000
++    values = [(0, 1, nanos), (14, 3, 0), (-14, 0, -1_000_000_000), None]
++    array = pa.array(values, type=pa.month_day_nano_interval())
++    field = pa.field(
++        "iv",
++        pa.month_day_nano_interval(),
++        metadata={b"POSTGRESQL:type": b"interval"},
++    )
++    table = pa.Table.from_arrays([array], schema=pa.schema([field]))
++    arrow_rs = SupersetResultSet.from_arrow(table, PostgresEngineSpec)
++    expected = [
++        93784000.0,
++        _normalize_interval(timedelta(days=365 + 30 * 2 + 3)),
++        _normalize_interval(timedelta(days=-(365 + 30 * 2), microseconds=-1_000_000)),
++        None,
++    ]
++    assert arrow_rs.pa_table.column("iv").to_pylist() == expected
++    assert arrow_rs.columns[0]["type"] == PostgresEngineSpec.get_datatype(1186)
++    row_rs = SupersetResultSet(
++        [(value,) for value in expected],
++        [("iv", arrow_rs.columns[0]["type"])],
++        PostgresEngineSpec,
++    )
++    assert (
++        arrow_rs.pa_table.column("iv").to_pylist()
++        == row_rs.pa_table.column("iv").to_pylist()
++    )
++
++    duration = pa.table({"iv": pa.array([1_000_000, None], type=pa.duration("us"))})
++    duration_rs = SupersetResultSet.from_arrow(duration, PostgresEngineSpec)
++    assert duration_rs.pa_table.column("iv").to_pylist() == [1000.0, None]
++
++    duck = SupersetResultSet.from_arrow(
++        pa.table({"iv": pa.array([(0, 1, 0)], type=pa.month_day_nano_interval())}),
++        DuckDBEngineSpec,
++    )
++    assert pa.types.is_interval(duck.pa_table.schema.field("iv").type)
 +
 +
 +def test_empty_table_keeps_column_names() -> None:
