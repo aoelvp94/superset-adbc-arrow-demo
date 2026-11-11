@@ -716,12 +716,225 @@ index 3251de7..cb34663 100644
          return self._nested_columns
  
      @property
+diff --git a/superset/sql/execution/executor.py b/superset/sql/execution/executor.py
+index 831b831..d3e1797 100644
+--- a/superset/sql/execution/executor.py
++++ b/superset/sql/execution/executor.py
+@@ -313,6 +313,63 @@ def _mutate_statement(database: Database, statement: str, is_split: bool) -> str
+     return stmt_sql
+ 
+ 
++def _result_set_for_statement(
++    db_engine_spec: type[BaseEngineSpec],
++    cursor: Any,
++    *,
++    row_limit: int | None,
++) -> SupersetResultSet:
++    """
++    Build the result set for a statement that returned a description.
++
++    ``row_limit`` is the cap for this statement, or None when the statement
++    is not capped (not the last statement, or the query has no limit).
++
++    Arrow ingest runs only when ``maybe_fetch_arrow`` returns a table: the
++    feature flag is on, the engine set ``supports_arrow_result``, and the
++    cursor can produce a Table. A decline leaves the cursor unconsumed and
++    the row path below is the one this function used before. ``_LimitedCursor``
++    only bounds ``fetchall`` / ``fetchmany``; Arrow reads are limited by the
++    ``limit`` argument instead. One extra row stands in for the row path's
++    truncation probe, which cannot run after a streaming reader has stopped.
++    """
++    from superset.result_set import SupersetResultSet
++
++    if row_limit is None:
++        table = db_engine_spec.maybe_fetch_arrow(cursor)
++        if table is not None:
++            return SupersetResultSet.from_arrow(table, db_engine_spec, truncated=False)
++        rows = db_engine_spec.fetch_data(cursor)
++        truncated = isinstance(rows, FetchedRows) and rows.truncated
++        return SupersetResultSet(
++            rows,
++            cursor.description,
++            db_engine_spec,
++            truncated=truncated,
++        )
++
++    table = db_engine_spec.maybe_fetch_arrow(cursor, row_limit + 1)
++    if table is not None:
++        truncated = table.num_rows > row_limit
++        if truncated:
++            table = table.slice(0, row_limit)
++        return SupersetResultSet.from_arrow(table, db_engine_spec, truncated=truncated)
++
++    # Keep each spec's conversion/error handling. Even specs that ignore
++    # a fetch_data limit can only consume the bounded cursor's budget.
++    limited_cursor = _LimitedCursor(cursor, row_limit)
++    rows = db_engine_spec.fetch_data(limited_cursor)
++    truncated = (isinstance(rows, FetchedRows) and rows.truncated) or (
++        limited_cursor.check_truncated(db_engine_spec)
++    )
++    return SupersetResultSet(
++        rows,
++        cursor.description,
++        db_engine_spec,
++        truncated=truncated,
++    )
++
++
+ def execute_sql_with_cursor(
+     database: Database,
+     cursor: Any,
+@@ -391,34 +448,25 @@ def execute_sql_with_cursor(
+         query_executed()
+         stmt_execution_time = (time.time() - stmt_start_time) * 1000
+ 
+-        # Fetch results from ALL statements
++        # Fetch results from ALL statements.
++        # Arrow ingest is opt-in inside ``_result_set_for_statement``.
++        # The row path, including ``_LimitedCursor``, stays the default.
+         description = cursor.description
+         if description:
+-            fetch_cursor = cursor
+-            limited_cursor = None
++            row_limit = None
+             # SQL restrictions cannot always be safely wrapped or replaced.
+             # Cap returned rows from the last statement, including RETURNING,
+             # not affected rows. Only explicit limits also honor SQL_MAX_ROW.
+             if i == total - 1 and query.limit is not None:
+-                row_limit: int = query.limit
++                row_limit = query.limit
+                 if sql_max_row := app.config.get("SQL_MAX_ROW"):
+                     row_limit = min(row_limit, sql_max_row)
+-                limited_cursor = _LimitedCursor(cursor, row_limit)
+-                fetch_cursor = limited_cursor
+-            # Keep each spec's conversion/error handling. Even specs that ignore
+-            # a fetch_data limit can only consume the bounded cursor's budget.
+-            rows = database.db_engine_spec.fetch_data(fetch_cursor)
+-            truncated = (isinstance(rows, FetchedRows) and rows.truncated) or (
+-                limited_cursor is not None
+-                and limited_cursor.check_truncated(database.db_engine_spec)
+-            )
+-            check_query_deadline()
+-            result_set = SupersetResultSet(
+-                rows,
+-                description,
++            result_set = _result_set_for_statement(
+                 database.db_engine_spec,
+-                truncated=truncated,
++                cursor,
++                row_limit=row_limit,
+             )
++            check_query_deadline()
+         else:
+             # DML statement - no result set
+             result_set = None
+diff --git a/superset/sql_lab.py b/superset/sql_lab.py
+index 3e619cc..f56ece1 100644
+--- a/superset/sql_lab.py
++++ b/superset/sql_lab.py
+@@ -327,6 +327,44 @@ def apply_limit(query: Query, parsed_statement: BaseSQLStatement[Any]) -> None:
+         )
+ 
+ 
++def _read_sqllab_payload(
++    query: Query,
++    cursor: Any,
++    db_engine_spec: type[BaseEngineSpec],
++) -> tuple[Any, Any]:
++    """
++    Read one SQL Lab statement, Arrow first and rows as the fallback.
++
++    Returns ``(table, None)`` when ``maybe_fetch_arrow`` produced a table,
++    or ``(None, rows)`` for the existing ``fetch_data`` path. The feature
++    flag and ``supports_arrow_result`` are enforced inside
++    ``maybe_fetch_arrow``; a decline does not consume the cursor.
++
++    ``query.limit + 1`` is fetched so an over-limit result can be told apart
++    from one that fits. The extra row is dropped here. ``limiting_factor``
++    is set to ``NOT_LIMITED`` only when the result fits, matching the
++    previous row-only behavior. The caller builds the ``SupersetResultSet``.
++    """
++    increased_limit = None if query.limit is None else query.limit + 1
++    table = db_engine_spec.maybe_fetch_arrow(cursor, increased_limit)
++    if table is not None:
++        if query.limit is None or table.num_rows <= query.limit:
++            query.limiting_factor = LimitingFactor.NOT_LIMITED
++        else:
++            # Same trim as ``data[:-1]`` on the row path: one extra row was
++            # requested, and ``fetch_arrow`` already stopped at that count.
++            table = table.slice(0, query.limit)
++        return table, None
++
++    data = db_engine_spec.fetch_data(cursor, increased_limit)
++    if query.limit is None or len(data) <= query.limit:
++        query.limiting_factor = LimitingFactor.NOT_LIMITED
++    else:
++        # return 1 row less than increased_query
++        data = data[:-1]
++    return None, data
++
++
+ def execute_query(  # pylint: disable=too-many-statements, too-many-locals  # noqa: C901
+     query: Query,
+     cursor: Any,
+@@ -346,6 +384,8 @@ def _execute_query(
+     """Run a statement inside the engine's interruption-safe cursor scope."""
+     database = query.database
+     db_engine_spec = database.db_engine_spec
++    arrow_table = None
++    data = None
+     try:
+         log_query = app.config["QUERY_LOGGER"]
+         if log_query:
+@@ -381,13 +421,11 @@ def _execute_query(
+                     query.id,
+                     str(query.to_dict()),
+                 )
+-                increased_limit = None if query.limit is None else query.limit + 1
+-                data = db_engine_spec.fetch_data(cursor, increased_limit)
+-                if query.limit is None or len(data) <= query.limit:
+-                    query.limiting_factor = LimitingFactor.NOT_LIMITED
+-                else:
+-                    # return 1 row less than increased_query
+-                    data = data[:-1]
++                # Arrow when the flag is on, the engine opted in, and the
++                # cursor can produce a Table. Otherwise the row path, including
++                # its limit trim, is unchanged. JSON serialization of the
++                # result set is unchanged either way.
++                arrow_table, data = _read_sqllab_payload(query, cursor, db_engine_spec)
+     except SoftTimeLimitExceeded as ex:
+         query.status = QueryStatus.TIMED_OUT
+ 
+@@ -418,6 +456,8 @@ def _execute_query(
+         raise SqlLabException(db_engine_spec.extract_error_message(ex)) from ex
+ 
+     logger.debug("Query %d: Fetching cursor description", query.id)
++    if arrow_table is not None:
++        return SupersetResultSet.from_arrow(arrow_table, db_engine_spec)
+     cursor_description = cursor.description
+     return SupersetResultSet(data, cursor_description, db_engine_spec)
+ 
+@@ -569,9 +609,11 @@ def execute_sql_statements(  # noqa: C901
+             database,
+             parsed_script,
+             disallowed_tables,
+-            table_schemas()
+-            if has_qualified_table_entry(disallowed_tables)
+-            else effective_schema,
++            (
++                table_schemas()
++                if has_qualified_table_entry(disallowed_tables)
++                else effective_schema
++            ),
+         )
+         if found_tables:
+             raise SupersetDisallowedSQLTableException(found_tables)
 diff --git a/tests/unit_tests/result_set_from_arrow_test.py b/tests/unit_tests/result_set_from_arrow_test.py
 new file mode 100644
-index 0000000..66c4c86
+index 0000000..f974820
 --- /dev/null
 +++ b/tests/unit_tests/result_set_from_arrow_test.py
-@@ -0,0 +1,347 @@
+@@ -0,0 +1,528 @@
 +# Licensed to the Apache Software Foundation (ASF) under one
 +# or more contributor license agreements.  See the NOTICE file
 +# distributed with this work for additional information
@@ -744,6 +957,7 @@ index 0000000..66c4c86
 +import math
 +from datetime import date, datetime, timedelta, timezone
 +from decimal import Decimal
++from typing import Any
 +from uuid import UUID
 +
 +import pyarrow as pa
@@ -790,7 +1004,9 @@ index 0000000..66c4c86
 +    # Arrow side. Compare values only in that case.
 +    if compare_generic:
 +        assert arrow_rs.columns[0]["type_generic"] == row_rs.columns[0]["type_generic"]
-+        assert bool(arrow_rs.columns[0]["is_dttm"]) == bool(row_rs.columns[0]["is_dttm"])
++        assert bool(arrow_rs.columns[0]["is_dttm"]) == bool(
++            row_rs.columns[0]["is_dttm"]
++        )
 +
 +
 +def test_from_arrow_accepts_a_plain_table_without_adbc() -> None:
@@ -868,7 +1084,9 @@ index 0000000..66c4c86
 +        pa.table({"c": pa.array(values, type=pa.uint64())}),
 +        BaseEngineSpec,
 +    )
-+    row_rs = SupersetResultSet([(value,) for value in values], [("c", "int")], BaseEngineSpec)
++    row_rs = SupersetResultSet(
++        [(value,) for value in values], [("c", "int")], BaseEngineSpec
++    )
 +    _same(
 +        arrow_rs.pa_table.column("c").to_pylist(),
 +        row_rs.pa_table.column("c").to_pylist(),
@@ -890,7 +1108,9 @@ index 0000000..66c4c86
 +
 +
 +def test_from_arrow_names_match_row_path() -> None:
-+    table = pa.table([pa.array([1]), pa.array([2]), pa.array([3])], names=["a", "a", ""])
++    table = pa.table(
++        [pa.array([1]), pa.array([2]), pa.array([3])], names=["a", "a", ""]
++    )
 +    arrow_rs = SupersetResultSet.from_arrow(table, BaseEngineSpec)
 +    row_rs = SupersetResultSet([(1, 2, 3)], [("a",), ("a",), ("",)], BaseEngineSpec)
 +    assert arrow_rs.pa_table.column_names == row_rs.pa_table.column_names
@@ -904,8 +1124,14 @@ index 0000000..66c4c86
 +        [("l",), ("s",)],
 +        BaseEngineSpec,
 +    )
-+    _same(arrow_rs.pa_table.column("l").to_pylist(), row_rs.pa_table.column("l").to_pylist())
-+    _same(arrow_rs.pa_table.column("s").to_pylist(), row_rs.pa_table.column("s").to_pylist())
++    _same(
++        arrow_rs.pa_table.column("l").to_pylist(),
++        row_rs.pa_table.column("l").to_pylist(),
++    )
++    _same(
++        arrow_rs.pa_table.column("s").to_pylist(),
++        row_rs.pa_table.column("s").to_pylist(),
++    )
 +    assert arrow_rs.nested_columns == row_rs.nested_columns
 +
 +
@@ -955,7 +1181,10 @@ index 0000000..66c4c86
 +    row_rs = SupersetResultSet([(1000.0,)], [("iv", "interval")], BaseEngineSpec)
 +    assert pa.types.is_duration(arrow_rs.pa_table.schema.field("iv").type)
 +    assert row_rs.pa_table.column("iv").to_pylist() == [1000.0]
-+    assert arrow_rs.pa_table.column("iv").to_pylist() != row_rs.pa_table.column("iv").to_pylist()
++    assert (
++        arrow_rs.pa_table.column("iv").to_pylist()
++        != row_rs.pa_table.column("iv").to_pylist()
++    )
 +
 +
 +def test_empty_table_keeps_column_names() -> None:
@@ -1069,3 +1298,168 @@ index 0000000..66c4c86
 +    )
 +    assert result.size == 1
 +    assert result.pa_table.column("n").to_pylist() == [1]
++
++
++class _Query:
++    def __init__(self, limit: int | None) -> None:
++        self.limit = limit
++        self.limiting_factor = "QUERY"
++
++
++class _ArrowCursor:
++    """Cursor with both an Arrow table and a consuming row fetch."""
++
++    def __init__(self, values: list[int]) -> None:
++        self.description = [("a", "int")]
++        self.values = values
++        self.arrow_reads = 0
++        self._rows = [(value,) for value in values]
++
++    def to_arrow_table(self) -> pa.Table:
++        self.arrow_reads += 1
++        return pa.table({"a": pa.array(self.values, type=pa.int64())})
++
++    def fetchmany(self, size: int | None = None) -> list[tuple[int, ...]]:
++        if size is None:
++            size = len(self._rows)
++        batch = self._rows[:size]
++        self._rows = self._rows[size:]
++        return batch
++
++    def fetchall(self) -> list[tuple[int, ...]]:
++        return self.fetchmany(len(self._rows))
++
++
++def _records(result: SupersetResultSet) -> list[dict[str, Any]]:
++    """The JSON shape SQL Lab returns when msgpack/IPC storage is off."""
++    from superset.dataframe import df_to_records
++
++    return df_to_records(result.to_pandas_df(), convert_decimals=True) or []
++
++
++def test_sqllab_uses_rows_when_the_flag_is_off(mocker: MockerFixture) -> None:
++    from superset.sql_lab import _read_sqllab_payload
++
++    cursor = _ArrowCursor([1, 2, 3])
++    query = _Query(limit=2)
++    mocker.patch("superset.is_feature_enabled", return_value=False)
++    table, rows = _read_sqllab_payload(query, cursor, DuckDBEngineSpec)
++    assert table is None
++    assert cursor.arrow_reads == 0
++    assert rows == [(1,), (2,)]
++    assert query.limiting_factor == "QUERY"
++
++    result = SupersetResultSet(rows, cursor.description, DuckDBEngineSpec)
++    assert _records(result) == [{"a": 1}, {"a": 2}]
++
++
++def test_sqllab_uses_arrow_when_opted_in_and_trims_the_extra_row(
++    mocker: MockerFixture,
++) -> None:
++    from superset.sql_lab import _read_sqllab_payload
++    from superset.sqllab.limiting_factor import LimitingFactor
++
++    cursor = _ArrowCursor([1, 2, 3])
++    query = _Query(limit=2)
++    mocker.patch("superset.is_feature_enabled", return_value=True)
++    table, rows = _read_sqllab_payload(query, cursor, DuckDBEngineSpec)
++    assert rows is None
++    assert cursor.arrow_reads == 1
++    assert query.limiting_factor == "QUERY"
++    result = SupersetResultSet.from_arrow(table, DuckDBEngineSpec)
++    assert result.pa_table.column("a").to_pylist() == [1, 2]
++    assert _records(result) == [{"a": 1}, {"a": 2}]
++
++    fitting = _Query(limit=10)
++    table, rows = _read_sqllab_payload(fitting, _ArrowCursor([1, 2]), DuckDBEngineSpec)
++    assert rows is None
++    assert fitting.limiting_factor == LimitingFactor.NOT_LIMITED
++    assert table.num_rows == 2
++
++
++def test_sqllab_falls_back_to_rows_without_an_arrow_cursor(
++    mocker: MockerFixture,
++) -> None:
++    """A psycopg2-style cursor has no Arrow fetch, even on an opted-in engine."""
++    from superset.sql_lab import _read_sqllab_payload
++
++    class _RowOnly:
++        def __init__(self, values: list[int]) -> None:
++            self.description = [("a", "int")]
++            self._rows = [(value,) for value in values]
++
++        def fetchmany(self, size: int | None = None) -> list[tuple[int, ...]]:
++            if size is None:
++                size = len(self._rows)
++            batch = self._rows[:size]
++            self._rows = self._rows[size:]
++            return batch
++
++        def fetchall(self) -> list[tuple[int, ...]]:
++            return self.fetchmany(len(self._rows))
++
++    cursor = _RowOnly([1, 2, 3])
++    query = _Query(limit=2)
++    mocker.patch("superset.is_feature_enabled", return_value=True)
++    table, rows = _read_sqllab_payload(query, cursor, DuckDBEngineSpec)
++    assert table is None
++    assert rows == [(1,), (2,)]
++
++
++def test_sqllab_falls_back_when_the_engine_has_not_opted_in(
++    mocker: MockerFixture,
++) -> None:
++    from superset.sql_lab import _read_sqllab_payload
++    from superset.sqllab.limiting_factor import LimitingFactor
++
++    cursor = _ArrowCursor([7])
++    query = _Query(limit=None)
++    mocker.patch("superset.is_feature_enabled", return_value=True)
++    table, rows = _read_sqllab_payload(query, cursor, BaseEngineSpec)
++    assert table is None
++    assert cursor.arrow_reads == 0
++    assert rows == [(7,)]
++    assert query.limiting_factor == LimitingFactor.NOT_LIMITED
++
++
++def test_executor_arrow_sets_truncated_from_the_extra_row(
++    mocker: MockerFixture,
++) -> None:
++    from superset.sql.execution.executor import _result_set_for_statement
++
++    mocker.patch("superset.is_feature_enabled", return_value=True)
++    truncated = _result_set_for_statement(
++        DuckDBEngineSpec, _ArrowCursor([1, 2, 3]), row_limit=2
++    )
++    assert truncated.truncated is True
++    assert truncated.pa_table.column("a").to_pylist() == [1, 2]
++    assert _records(truncated) == [{"a": 1}, {"a": 2}]
++
++    exact = _result_set_for_statement(
++        DuckDBEngineSpec, _ArrowCursor([1, 2]), row_limit=2
++    )
++    assert exact.truncated is False
++    assert exact.size == 2
++
++    unlimited = _result_set_for_statement(
++        DuckDBEngineSpec, _ArrowCursor([1, 2, 3]), row_limit=None
++    )
++    assert unlimited.truncated is False
++    assert unlimited.size == 3
++
++
++def test_executor_row_fallback_still_probes_truncation(
++    mocker: MockerFixture,
++) -> None:
++    from superset.sql.execution.executor import _result_set_for_statement
++
++    mocker.patch("superset.is_feature_enabled", return_value=False)
++    cursor = _ArrowCursor([1, 2, 3])
++    result = _result_set_for_statement(DuckDBEngineSpec, cursor, row_limit=2)
++    assert cursor.arrow_reads == 0
++    assert result.truncated is True
++    assert result.pa_table.column("a").to_pylist() == [1, 2]
++
++    short = _result_set_for_statement(DuckDBEngineSpec, _ArrowCursor([1]), row_limit=2)
++    assert short.truncated is False
++    assert short.pa_table.column("a").to_pylist() == [1]
