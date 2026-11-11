@@ -25,8 +25,11 @@ FS_USER = FS_PASSWORD = "bench"
 BACKENDS = ("postgres", "duckdb", "flightsql")
 # rows      = the backend's classic row driver + current SupersetResultSet
 # adbc_rows = ADBC driver, but still fetchall() + current SupersetResultSet
-#             (what a Superset user on sqlalchemy-adbc gets today, see #45937)
-# arrow     = ADBC fetch_arrow_table() + prototype SupersetResultSet.from_arrow
+#             (diagnostic: what a sqlalchemy-adbc user gets if the result set
+#             stays row-based; often slower; not a proposed feature)
+# arrow     = ADBC cursor Arrow fetch + SupersetResultSet.from_arrow.
+#             from_arrow accepts any pyarrow.Table. ADBC is the source this
+#             harness uses, not a requirement of the constructor.
 PATHS = ("rows", "adbc_rows", "arrow")
 
 COLUMNS = ("id", "i32", "f64", "dec", "txt", "ts_tz", "ts", "d", "b", "js", "u")

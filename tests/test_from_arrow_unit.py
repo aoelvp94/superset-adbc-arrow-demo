@@ -1,6 +1,12 @@
-"""Unit tests for the prototype SupersetResultSet.from_arrow (no services)."""
+"""Unit tests for SupersetResultSet.from_arrow (no services).
 
+Parity tests compare from_arrow to the existing row constructor. They do not
+define a new result contract.
+"""
+
+import datetime
 import decimal
+import math
 import uuid
 
 import pyarrow as pa
@@ -145,3 +151,195 @@ def test_fetch_arrow_none_for_row_cursor(superset_ctx):
         description = [("a", 23)]
 
     assert PostgresEngineSpec.fetch_arrow(RowCursor()) is None
+
+
+def _same(left, right):
+    assert len(left) == len(right)
+    for got, expected in zip(left, right, strict=True):
+        if isinstance(got, float) and isinstance(expected, float):
+            if math.isnan(got) and math.isnan(expected):
+                continue
+        assert got == expected, (got, expected)
+
+
+def _assert_matches_row(rs_cls, spec, type_code, values, arrow_column=None, compare_generic=True):
+    column = values if arrow_column is None else arrow_column
+    row_rs = rs_cls([(value,) for value in values], [("c", type_code)], spec)
+    arrow_rs = rs_cls.from_arrow(pa.table({"c": column}), spec)
+    _same(arrow_rs.pa_table.column("c").to_pylist(), row_rs.pa_table.column("c").to_pylist())
+    # Decimals are not named by convert_pa_dtype. Without driver metadata,
+    # do not invent a generic type the row path does not report.
+    if compare_generic:
+        assert arrow_rs.columns[0]["type_generic"] == row_rs.columns[0]["type_generic"]
+        assert bool(arrow_rs.columns[0]["is_dttm"]) == bool(row_rs.columns[0]["is_dttm"])
+
+
+def test_plain_table_does_not_require_adbc(rs_cls, spec):
+    table = pa.table({"a": pa.array([1, None, 0])})
+    result = rs_cls.from_arrow(table, spec)
+    assert result.pa_table.column("a").to_pylist() == [1, None, 0]
+    assert spec.supports_arrow_result is False
+
+
+def test_timestamps_match_row_path(rs_cls, spec):
+    offset = datetime.timezone(datetime.timedelta(hours=5, minutes=45))
+    _assert_matches_row(rs_cls, spec, "timestamp", [datetime.datetime(2024, 1, 2, 3, 4, 5), None])
+    _assert_matches_row(
+        rs_cls, spec, "timestamptz", [datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc), None]
+    )
+    _assert_matches_row(
+        rs_cls,
+        spec,
+        "timestamptz",
+        [datetime.datetime(2024, 6, 1, 12, 30, tzinfo=offset), None],
+    )
+    _assert_matches_row(rs_cls, spec, "timestamp", [datetime.datetime(9999, 12, 31, 23, 59, 59)])
+    _assert_matches_row(
+        rs_cls, spec, "timestamptz", [datetime.datetime(3118, 1, 1, tzinfo=datetime.timezone.utc)]
+    )
+
+
+def test_dates_bools_blobs_nulls_and_small_ints_match_row_path(rs_cls, spec):
+    _assert_matches_row(rs_cls, spec, "date", [datetime.date(2020, 1, 2), None])
+    _assert_matches_row(rs_cls, spec, "bool", [True, False, None])
+    _assert_matches_row(rs_cls, spec, "bytea", [b"abc", None, b""])
+    _assert_matches_row(rs_cls, spec, "int", [1, None, 0, -3])
+    _assert_matches_row(rs_cls, spec, "int", [None, None], pa.array([None, None], type=pa.int64()))
+
+
+def test_finite_decimals_match_row_path(rs_cls, spec):
+    _assert_matches_row(
+        rs_cls, spec, "numeric",
+        [decimal.Decimal("1.50"), decimal.Decimal("-0.0001"), None],
+        compare_generic=False,
+    )
+    wide = decimal.Decimal("123456789012345678901234567890.123456789")
+    _assert_matches_row(rs_cls, spec, "numeric", [wide, None], compare_generic=False)
+
+
+def test_non_finite_floats_match_row_path(rs_cls, spec):
+    _assert_matches_row(
+        rs_cls,
+        spec,
+        "float8",
+        [float("nan"), float("inf"), float("-inf"), 1.5, 0.0, None],
+    )
+
+
+def test_uint64_above_int64_matches_row_stringification(rs_cls, spec):
+    big = 2**64 - 1
+    values = [1, big, 0, None]
+    _assert_matches_row(rs_cls, spec, "int", values, pa.array(values, type=pa.uint64()))
+
+
+def test_uint64_that_fits_keeps_equal_values(rs_cls, spec):
+    values = [1, 2, None]
+    arrow_rs = rs_cls.from_arrow(pa.table({"c": pa.array(values, type=pa.uint64())}), spec)
+    row_rs = rs_cls([(value,) for value in values], [("c", "int")], spec)
+    _same(arrow_rs.pa_table.column("c").to_pylist(), row_rs.pa_table.column("c").to_pylist())
+    assert pa.types.is_uint64(arrow_rs.pa_table.schema.field("c").type)
+
+
+def test_int64_safe_and_beyond_js_safe_stay_integers(rs_cls, spec):
+    """The row path stringifies only when the value does not fit in int64."""
+    value = 2**53 + 1
+    _assert_matches_row(rs_cls, spec, "int", [value, -value, None])
+    result = rs_cls.from_arrow(pa.table({"c": [value, -value, None]}), spec)
+    assert pa.types.is_integer(result.pa_table.schema.field("c").type)
+
+
+def test_non_finite_decimal_nulls_cells_and_keeps_finite_decimals(rs_cls, spec):
+    """
+    The row constructor stringifies a whole column when pa.array rejects a
+    non-finite Decimal. from_arrow nulls only those cells.
+    """
+    rows = [
+        (decimal.Decimal("1.50"),),
+        (decimal.Decimal("NaN"),),
+        (decimal.Decimal("Infinity"),),
+        (decimal.Decimal("-Infinity"),),
+        (None,),
+    ]
+    row_rs = rs_cls(rows, [("n", "numeric")], spec)
+    row_vals = row_rs.pa_table.column("n").to_pylist()
+    assert row_vals[1] is None and row_vals[2] is None and row_vals[3] is None
+    assert all(value is None or isinstance(value, str) for value in row_vals)
+
+    opaque = pa.opaque(pa.string(), "numeric", "PostgreSQL")
+    storage = pa.array(["1.50", "NaN", "Infinity", "-Infinity", None])
+    arrow_rs = rs_cls.from_arrow(
+        pa.table({"n": pa.ExtensionArray.from_storage(opaque, storage)}), spec
+    )
+    assert arrow_rs.pa_table.column("n").to_pylist() == [
+        decimal.Decimal("1.5000"),
+        None,
+        None,
+        None,
+        None,
+    ]
+
+
+def test_duration_is_not_the_postgres_interval_mutator(rs_cls, spec):
+    table = pa.table({"iv": pa.array([1_000_000], type=pa.duration("us"))})
+    arrow_rs = rs_cls.from_arrow(table, spec)
+    row_rs = rs_cls([(1000.0,)], [("iv", "interval")], spec)
+    assert pa.types.is_duration(arrow_rs.pa_table.schema.field("iv").type)
+    assert row_rs.pa_table.column("iv").to_pylist() == [1000.0]
+    assert arrow_rs.pa_table.column("iv").to_pylist() != row_rs.pa_table.column("iv").to_pylist()
+
+
+def test_fetch_arrow_accepts_a_table_without_adbc(superset_ctx):
+    """A cursor that only has to_arrow_table (no fetch_record_batch) still works."""
+    from superset.db_engine_specs.duckdb import DuckDBEngineSpec
+
+    class TableCursor:
+        description = [("a", pa.int64())]
+
+        def to_arrow_table(self):
+            return pa.table({"a": pa.array([1, 2, 3, 4, 5])})
+
+    table = DuckDBEngineSpec.fetch_arrow(TableCursor(), limit=2)
+    assert table.column("a").to_pylist() == [1, 2]
+
+
+def test_engines_opt_in_individually_and_the_flag_defaults_off(superset_ctx):
+    from superset import feature_flag_manager
+    from superset.db_engine_specs.base import BaseEngineSpec
+    from superset.db_engine_specs.duckdb import DuckDBEngineSpec
+    from superset.db_engine_specs.flightsql import FlightSQLEngineSpec
+    from superset.db_engine_specs.mysql import MySQLEngineSpec
+    from superset.db_engine_specs.postgres import PostgresEngineSpec
+
+    assert BaseEngineSpec.supports_arrow_result is False
+    assert MySQLEngineSpec.supports_arrow_result is False
+    assert DuckDBEngineSpec.supports_arrow_result is True
+    assert PostgresEngineSpec.supports_arrow_result is True
+    assert FlightSQLEngineSpec.supports_arrow_result is True
+    assert feature_flag_manager.is_feature_enabled("ARROW_NATIVE_RESULT_SET") is False
+
+    class Cursor:
+        def __init__(self):
+            self.description = [("a", "int")]
+            self.consumed = False
+
+        def fetch_record_batch(self):
+            self.consumed = True
+            return pa.table({"a": [1]})
+
+    cursor = Cursor()
+    assert DuckDBEngineSpec.maybe_fetch_arrow(cursor) is None
+    assert cursor.consumed is False
+
+    flags = feature_flag_manager._feature_flags
+    previous = flags.get("ARROW_NATIVE_RESULT_SET")
+    flags["ARROW_NATIVE_RESULT_SET"] = True
+    try:
+        table = DuckDBEngineSpec.maybe_fetch_arrow(cursor)
+        assert table.num_rows == 1
+        assert cursor.consumed is True
+        assert BaseEngineSpec.maybe_fetch_arrow(Cursor()) is None
+    finally:
+        if previous is None:
+            flags.pop("ARROW_NATIVE_RESULT_SET", None)
+        else:
+            flags["ARROW_NATIVE_RESULT_SET"] = previous
