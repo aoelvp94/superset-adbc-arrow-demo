@@ -305,9 +305,12 @@ with more headroom could rerun with a higher `--max-rss-gb`.
   GizmoSQL process.
 - **Type parity is not bit-identical in every column.** Known, pinned
   divergences (integer width, decimal precision metadata, JSON whitespace in
-  the IPC payload, interval handling, some Flight SQL date conversions) are
+  the IPC payload, some Flight SQL date conversions) are
   listed in [`docs/type-parity.md`](docs/type-parity.md) and asserted by
-  `just test` when the services are up. Interval is an open gap. Constructor
+  `just test` when the services are up. Postgres interval values now match the
+  row path in constructor tests (`1 day 02:03:04` is 93784000.0 ms). The
+  committed live golden still shows the old interval divergence because
+  `just parity` was not re-run. Constructor
   tests that do not need services live in `tests/test_from_arrow_unit.py`.
 - **UUID stringification is vectorized in the patch** (NumPy, not the
   per-value Python loop in `stringify_extension_columns`). That loop

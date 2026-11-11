@@ -17,7 +17,7 @@ the files in this patch. The numbers in `results/` were not re-run after either 
 |---|---|
 | `superset/result_set.py` | `SupersetResultSet.from_arrow(table, db_engine_spec)` builds a result set from any `pyarrow.Table`. It does not fetch and does not require ADBC. Same column-name normalization and dedup as the row constructor; dictionary columns decoded; `arrow.opaque` NUMERIC becomes `decimal128` / `decimal256` with NaN/Infinity mapped to NULL; `arrow.json` kept as text and parsed lazily on the sync path; nested values stringified and kept in `nested_columns`; `arrow.uuid` stringified with NumPy; uint64 values above 2**63−1 stringify the whole column, matching the row constructor's overflow fallback. The row constructor is unchanged. |
 | `superset/db_engine_specs/base.py` | `supports_arrow_result = False` (engines opt in one at a time). `fetch_arrow` accepts `to_arrow_reader`, `fetch_record_batch` (ADBC), `to_arrow_table`, or `fetch_arrow_table`, and returns None when the cursor has none of them. `maybe_fetch_arrow` is the production gate: feature flag `ARROW_NATIVE_RESULT_SET` and the engine capability. `get_datatype_from_arrow_field` reads `<VENDOR>:type` metadata. |
-| `superset/db_engine_specs/postgres.py` | Opts in. psycopg2 still has no Arrow fetch, so it stays on `fetch_data`. Maps ADBC `POSTGRESQL:type` names through the built-in OIDs and `get_datatype`, so `.columns` type strings match the psycopg2 row path. |
+| `superset/db_engine_specs/postgres.py` | Opts in. psycopg2 still has no Arrow fetch, so it stays on `fetch_data`. Maps ADBC `POSTGRESQL:type` names through the built-in OIDs and `get_datatype`, so `.columns` type strings match the psycopg2 row path. `normalize_arrow_column` turns `month_day_nano_interval` and `duration` into the milliseconds `_normalize_interval` already produces in `fetch_data`. |
 | `superset/db_engine_specs/duckdb.py` | Opts in. DuckDB can return a Table through `to_arrow_reader` / `to_arrow_table` without ADBC. MotherDuck inherits the flag. |
 | `superset/db_engine_specs/flightsql.py` | Sketch of a generic Flight SQL spec (`flightsql+adbc://`). An example opt-in, not a requirement of `from_arrow`. |
 | `superset/models/core.py` | `Database.get_df` (chart and dataset queries) uses `maybe_fetch_arrow` and then `from_arrow`. When that returns None, `fetch_data` is unchanged. The method still returns a DataFrame via `to_pandas_df()`. |
@@ -31,7 +31,7 @@ Deliberately out of scope, for a later upstream review:
 
 * Chart-data Arrow on the wire and the frontend shim (draft apache/superset#45363).
 * `get_df` is also used by alerts and SQL Lab export, so they share this gate once the flag is on. Metadata probes in `connectors/sqla/utils.py`, and `Database.fetch_rows`, stay on `fetch_data`. SQL Lab's results read-back decodes whatever execute stored; it does not fetch again. The browser payload stays JSON unless the results backend is storing IPC, which it already did.
-* Postgres interval normalization. `fetch_data` converts timedeltas to milliseconds before the row constructor. `from_arrow` does not. Pinned as a known gap.
+* DuckDB intervals stay `month_day_nano_interval` / `duration`. Only Postgres applies the milliseconds mutator. A Postgres interval stored as text, rather than `month_day_nano_interval` or `duration`, is not rewritten.
 * A non-finite `Decimal` makes the row constructor stringify the whole column, because `pa.array` rejects it. `from_arrow` nulls only those cells and keeps finite values as decimals.
 * sqlalchemy-adbc reflection (#45937).
 

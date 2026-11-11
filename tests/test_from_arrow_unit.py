@@ -280,12 +280,61 @@ def test_non_finite_decimal_nulls_cells_and_keeps_finite_decimals(rs_cls, spec):
 
 
 def test_duration_is_not_the_postgres_interval_mutator(rs_cls, spec):
+    """BaseEngineSpec does not apply the Postgres mutator."""
     table = pa.table({"iv": pa.array([1_000_000], type=pa.duration("us"))})
     arrow_rs = rs_cls.from_arrow(table, spec)
     row_rs = rs_cls([(1000.0,)], [("iv", "interval")], spec)
     assert pa.types.is_duration(arrow_rs.pa_table.schema.field("iv").type)
     assert row_rs.pa_table.column("iv").to_pylist() == [1000.0]
     assert arrow_rs.pa_table.column("iv").to_pylist() != row_rs.pa_table.column("iv").to_pylist()
+
+
+def test_postgres_interval_matches_fetch_data_milliseconds(rs_cls, superset_ctx):
+    """
+    1 day 02:03:04 is 93784000.0 ms. A year is 365 days and a month is 30,
+    matching the timedelta psycopg2 hands to fetch_data. DuckDB is unchanged.
+    """
+    from datetime import timedelta
+
+    from superset.db_engine_specs.duckdb import DuckDBEngineSpec
+    from superset.db_engine_specs.postgres import PostgresEngineSpec, _normalize_interval
+
+    nanos = (2 * 3600 + 3 * 60 + 4) * 1_000_000_000
+    values = [(0, 1, nanos), (14, 3, 0), (-14, 0, -1_000_000_000), None]
+    array = pa.array(values, type=pa.month_day_nano_interval())
+    field = pa.field(
+        "iv",
+        pa.month_day_nano_interval(),
+        metadata={b"POSTGRESQL:type": b"interval"},
+    )
+    table = pa.Table.from_arrays([array], schema=pa.schema([field]))
+    arrow_rs = rs_cls.from_arrow(table, PostgresEngineSpec)
+    expected = [
+        93784000.0,
+        _normalize_interval(timedelta(days=365 + 30 * 2 + 3)),
+        _normalize_interval(timedelta(days=-(365 + 30 * 2), microseconds=-1_000_000)),
+        None,
+    ]
+    assert arrow_rs.pa_table.column("iv").to_pylist() == expected
+    assert arrow_rs.columns[0]["type"] == PostgresEngineSpec.get_datatype(1186)
+    row_rs = rs_cls(
+        [(value,) for value in expected],
+        [("iv", arrow_rs.columns[0]["type"])],
+        PostgresEngineSpec,
+    )
+    assert arrow_rs.pa_table.column("iv").to_pylist() == row_rs.pa_table.column("iv").to_pylist()
+
+    duration = pa.table({"iv": pa.array([1_000_000, None], type=pa.duration("us"))})
+    assert rs_cls.from_arrow(duration, PostgresEngineSpec).pa_table.column("iv").to_pylist() == [
+        1000.0,
+        None,
+    ]
+
+    duck = rs_cls.from_arrow(
+        pa.table({"iv": pa.array([(0, 1, 0)], type=pa.month_day_nano_interval())}),
+        DuckDBEngineSpec,
+    )
+    assert pa.types.is_interval(duck.pa_table.schema.field("iv").type)
 
 
 def test_fetch_arrow_accepts_a_table_without_adbc(superset_ctx):

@@ -19,9 +19,13 @@ Two differences are intentional and pinned in those tests:
   `pa.array` rejects it. `from_arrow` nulls only the non-finite cells and keeps finite
   values as decimals (the same per-cell rule `stringify_values` states: NaN and
   Infinity have no exact value).
-* Postgres intervals are converted to milliseconds inside `fetch_data`, before the
-  row constructor. `from_arrow` does not apply that mutator. A duration column stays
-  a duration. This is still an open gap.
+* On `PostgresEngineSpec`, `from_arrow` applies the same milliseconds conversion
+  `fetch_data` applies to a timedelta. `month_day_nano_interval` uses psycopg2's
+  day counts (a year is 365 days, a month is 30) before `_normalize_interval`.
+  A `duration` column is already a timedelta and goes through that function.
+  `1 day 02:03:04` is 93784000.0 on both paths. `BaseEngineSpec` and DuckDB do
+  not rewrite intervals. The 2026-11-10 live run below still records the old
+  divergence; that harness was not re-run.
 
 **Live comparison** below is the 2026-11-10 run. Source of truth:
 `results/type-parity.json` (written by `just parity`) and the pinned signature in
@@ -56,7 +60,7 @@ match on Postgres and DuckDB; on Flight SQL they match between adbc_rows and arr
 |---|---|---|---|---|
 | postgres | `'NaN'::numeric` | NULL (Arrow `null`) | NULL (Arrow `string`, all-null) | `from_arrow` maps NaN/Infinity to NULL like `stringify_values`; an all-NULL column keeps the storage type. |
 | postgres | 39-digit numeric | `decimal256(39, 9)` | `decimal256(76, 9)` | Exact value preserved on both. |
-| postgres, duckdb | `interval` | Postgres: float milliseconds, 93784000.0 (`column_type_mutators`, applied in `fetch_data` before the row constructor); DuckDB: `duration[us]` | `month_day_nano_interval` | **Open.** `from_arrow` does not apply the Postgres mutator. Needs an engine-spec hook, or a cast when months == 0. |
+| postgres, duckdb | `interval` | Postgres: float milliseconds, 93784000.0 (`column_type_mutators`, applied in `fetch_data` before the row constructor); DuckDB: `duration[us]` | `month_day_nano_interval` in this 2026-11-10 run | **Postgres constructor gap closed since this run.** `PostgresEngineSpec.normalize_arrow_column` now emits the same milliseconds. DuckDB is unchanged. Re-run `just parity` before treating this row as current. |
 | postgres | `'5'::json` (scalar) | psycopg2 parses -> `int64` column | JSON text `"5"` (string), not nested | Row path type depends on the JSON content; Arrow keeps the declared type. |
 | postgres, duckdb | `NULL::text` / `NULL::VARCHAR` | Arrow `null` | Arrow `string` | DuckDB rows reports type `None`, arrow `STRING`. |
 | flightsql | `[1, 2, NULL]` | flightsql-dbapi returns `numpy.ndarray` in `nested_columns` / sync records | Python `list` | an ndarray cell breaks `v == v`-style checks (it broke this harness once). |
