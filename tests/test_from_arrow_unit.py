@@ -343,3 +343,179 @@ def test_engines_opt_in_individually_and_the_flag_defaults_off(superset_ctx):
             flags.pop("ARROW_NATIVE_RESULT_SET", None)
         else:
             flags["ARROW_NATIVE_RESULT_SET"] = previous
+
+
+class _LimitQuery:
+    def __init__(self, limit):
+        self.limit = limit
+        self.limiting_factor = "QUERY"
+
+
+class _BothCursor:
+    """Arrow table plus a consuming row fetch, so either path can run."""
+
+    def __init__(self, values):
+        self.description = [("a", "int")]
+        self.values = list(values)
+        self.arrow_reads = 0
+        self._rows = [(value,) for value in values]
+
+    def to_arrow_table(self):
+        self.arrow_reads += 1
+        return pa.table({"a": pa.array(self.values, type=pa.int64())})
+
+    def fetchmany(self, size=None):
+        if size is None:
+            size = len(self._rows)
+        batch = self._rows[:size]
+        self._rows = self._rows[size:]
+        return batch
+
+    def fetchall(self):
+        return self.fetchmany(len(self._rows))
+
+
+class _RowOnlyCursor:
+    """Row fetch only. Opted-in engines still fall back when this is the cursor."""
+
+    def __init__(self, values):
+        self.description = [("a", "int")]
+        self._rows = [(value,) for value in values]
+
+    def fetchmany(self, size=None):
+        if size is None:
+            size = len(self._rows)
+        batch = self._rows[:size]
+        self._rows = self._rows[size:]
+        return batch
+
+    def fetchall(self):
+        return self.fetchmany(len(self._rows))
+
+
+def _with_flag(on):
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _ctx():
+        from superset import feature_flag_manager
+
+        flags = feature_flag_manager._feature_flags
+        previous = flags.get("ARROW_NATIVE_RESULT_SET")
+        flags["ARROW_NATIVE_RESULT_SET"] = on
+        try:
+            yield
+        finally:
+            if previous is None:
+                flags.pop("ARROW_NATIVE_RESULT_SET", None)
+            else:
+                flags["ARROW_NATIVE_RESULT_SET"] = previous
+
+    return _ctx()
+
+
+def _json_records(result):
+    from superset.dataframe import df_to_records
+
+    return df_to_records(result.to_pandas_df(), convert_decimals=True) or []
+
+
+def test_sqllab_stays_on_rows_when_the_flag_is_off(superset_ctx):
+    from superset.db_engine_specs.duckdb import DuckDBEngineSpec
+    from superset.sql_lab import _read_sqllab_payload
+
+    cursor = _BothCursor([1, 2, 3])
+    query = _LimitQuery(2)
+    with _with_flag(False):
+        table, rows = _read_sqllab_payload(query, cursor, DuckDBEngineSpec)
+    assert table is None
+    assert cursor.arrow_reads == 0
+    assert rows == [(1,), (2,)]
+    assert query.limiting_factor == "QUERY"
+    from superset.result_set import SupersetResultSet
+
+    assert _json_records(SupersetResultSet(rows, cursor.description, DuckDBEngineSpec)) == [
+        {"a": 1},
+        {"a": 2},
+    ]
+
+
+def test_sqllab_uses_arrow_and_drops_the_extra_limit_row(superset_ctx):
+    from superset.db_engine_specs.duckdb import DuckDBEngineSpec
+    from superset.result_set import SupersetResultSet
+    from superset.sql_lab import _read_sqllab_payload
+    from superset.sqllab.limiting_factor import LimitingFactor
+
+    cursor = _BothCursor([1, 2, 3])
+    query = _LimitQuery(2)
+    with _with_flag(True):
+        table, rows = _read_sqllab_payload(query, cursor, DuckDBEngineSpec)
+    assert rows is None
+    assert cursor.arrow_reads == 1
+    assert query.limiting_factor == "QUERY"
+    result = SupersetResultSet.from_arrow(table, DuckDBEngineSpec)
+    assert result.pa_table.column("a").to_pylist() == [1, 2]
+    assert _json_records(result) == [{"a": 1}, {"a": 2}]
+
+    fitting = _LimitQuery(10)
+    with _with_flag(True):
+        table, rows = _read_sqllab_payload(fitting, _BothCursor([1, 2]), DuckDBEngineSpec)
+    assert rows is None
+    assert fitting.limiting_factor == LimitingFactor.NOT_LIMITED
+    assert table.num_rows == 2
+
+
+def test_sqllab_falls_back_without_arrow_or_without_opt_in(superset_ctx):
+    from superset.db_engine_specs.base import BaseEngineSpec
+    from superset.db_engine_specs.duckdb import DuckDBEngineSpec
+    from superset.sql_lab import _read_sqllab_payload
+    from superset.sqllab.limiting_factor import LimitingFactor
+
+    # Opted-in engine, cursor with no Arrow method (psycopg2's situation).
+    row_cursor = _RowOnlyCursor([1, 2, 3])
+    query = _LimitQuery(2)
+    with _with_flag(True):
+        table, rows = _read_sqllab_payload(query, row_cursor, DuckDBEngineSpec)
+    assert table is None
+    assert rows == [(1,), (2,)]
+
+    # Cursor can produce a Table, but this engine has not opted in.
+    arrow_cursor = _BothCursor([7])
+    open_query = _LimitQuery(None)
+    with _with_flag(True):
+        table, rows = _read_sqllab_payload(open_query, arrow_cursor, BaseEngineSpec)
+    assert table is None
+    assert arrow_cursor.arrow_reads == 0
+    assert rows == [(7,)]
+    assert open_query.limiting_factor == LimitingFactor.NOT_LIMITED
+
+
+def test_executor_arrow_opt_in_and_row_fallback(superset_ctx):
+    from superset.db_engine_specs.duckdb import DuckDBEngineSpec
+    from superset.sql.execution.executor import _result_set_for_statement
+
+    with _with_flag(True):
+        truncated = _result_set_for_statement(
+            DuckDBEngineSpec, _BothCursor([1, 2, 3]), row_limit=2
+        )
+        exact = _result_set_for_statement(
+            DuckDBEngineSpec, _BothCursor([1, 2]), row_limit=2
+        )
+        unlimited = _result_set_for_statement(
+            DuckDBEngineSpec, _BothCursor([1, 2, 3]), row_limit=None
+        )
+    assert truncated.truncated is True
+    assert truncated.pa_table.column("a").to_pylist() == [1, 2]
+    assert _json_records(truncated) == [{"a": 1}, {"a": 2}]
+    assert exact.truncated is False and exact.size == 2
+    assert unlimited.truncated is False and unlimited.size == 3
+
+    cursor = _BothCursor([1, 2, 3])
+    with _with_flag(False):
+        fallback = _result_set_for_statement(DuckDBEngineSpec, cursor, row_limit=2)
+        short = _result_set_for_statement(DuckDBEngineSpec, _BothCursor([1]), row_limit=2)
+    assert cursor.arrow_reads == 0
+    assert fallback.truncated is True
+    assert fallback.pa_table.column("a").to_pylist() == [1, 2]
+    assert short.truncated is False
+    assert short.pa_table.column("a").to_pylist() == [1]

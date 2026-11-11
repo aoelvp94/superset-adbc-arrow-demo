@@ -26,12 +26,15 @@ objects. Evan Rusackas's draft
 [apache/superset#45363](https://github.com/apache/superset/pull/45363) is the
 opt-in Arrow IPC response on that endpoint, plus a frontend shim that turns the
 bytes back into the row objects plugins already consume. This demo does not
-change that API, the shim, or SQL Lab's results grid. The two pieces are
+change that API or the shim. SQL Lab's results grid still receives JSON row
+objects: `_serialize_and_expand_data` still calls `to_pandas_df()` and
+`df_to_records` unless the results backend is storing IPC. The two pieces are
 complementary: #45363 is how an opted-in chart asks for Arrow on the wire; this
 patch is how the backend can build the result set without paying `fetchall`
 first. Superset's chart query path still converts the result set to a DataFrame
 inside `Database.get_df` before the rest of chart code runs. This patch leaves
-that conversion in place.
+that conversion in place. SQL Lab's synchronous JSON payload does the same
+after the result set exists.
 
 ## Opt-in
 
@@ -43,13 +46,19 @@ The row path is the default and the fallback.
   on `fetch_data`.
 * Feature flag `ARROW_NATIVE_RESULT_SET` defaults to `False`. It is a global
   rollback, not the per-engine switch. `Database.get_df` (chart and dataset
-  queries) calls `maybe_fetch_arrow` only when the flag is on, and that method
-  still returns `None` unless the engine opted in and the cursor can produce a
-  Table. psycopg2 has no Arrow fetch, so a normal PostgreSQL connection stays
-  on rows even when both switches are on.
-* SQL Lab's execute path (`sql_lab.py`, `sql/execution/executor.py`) is
-  unchanged and still uses `fetch_data`. `get_df` is also used by alerts and
-  SQL Lab export, so those callers share the gate once the flag is on.
+  queries) and SQL Lab execute call `maybe_fetch_arrow` only when the flag is
+  on, and that method still returns `None` unless the engine opted in and the
+  cursor can produce a Table. psycopg2 has no Arrow fetch, so a normal
+  PostgreSQL connection stays on rows even when both switches are on.
+* SQL Lab execute uses that same gate in both places that build a result set:
+  `sql_lab._read_sqllab_payload` (the `/api/v1/sqllab/execute` path) and
+  `sql.execution.executor._result_set_for_statement` (synchronous
+  `Database.execute` and the async Celery task). The row path is what runs
+  when the gate declines, including its limit trim and, on the executor, the
+  `_LimitedCursor` truncation probe. Column-description probes in
+  `connectors/sqla/utils.py` stay on `fetch_data`. `get_df` is also used by
+  alerts and SQL Lab export, so those callers share the gate once the flag
+  is on.
 
 `adbc_rows` in the harness is a diagnostic. It is an ADBC cursor fed through
 today's `fetchall()` and the row constructor, which is what a `sqlalchemy-adbc`
@@ -61,7 +70,9 @@ classic row driver. It is not a proposed feature.
 The numbers below are the 2026-11-10 run against apache/superset
 `a131fcb623d88ed9eb7e7a414e226437423d645c` plus the patch as it was that day.
 This branch retargets the patch onto master
-`7d715a82a69a40389d0f4ce20f0e8ccfb17ce889` (2026-11-11) and does not replace
+`14365bbebd3ecfb3d9a0c1304908248d5fbeb3d4` (2026-11-11). The files the patch
+touches did not change between the previous pin `7d715a8` and this one; the
+patch was re-applied and the pin moved. It does not replace
 those snapshots. No 1M re-bench was run. The Arrow path in that run was an ADBC
 `fetch_record_batch` into `from_arrow`. ADBC cursors still take that method;
 the constructor now also accepts DuckDB's `to_arrow_reader` / `to_arrow_table`
@@ -105,7 +116,7 @@ deterministically in each engine.
 | Path | Purpose |
 |---|---|
 | `patches/0001-arrow-native-result-set.patch` | Ingest patch against the commit in `SUPERSET_COMMIT`. See `patches/README.md`. |
-| `SUPERSET_COMMIT` | `7d715a82a69a40389d0f4ce20f0e8ccfb17ce889` (apache/superset master on 2026-11-11). |
+| `SUPERSET_COMMIT` | `14365bbebd3ecfb3d9a0c1304908248d5fbeb3d4` (apache/superset master on 2026-11-11). |
 | `bench/run_bench.py`, `bench/run_one.py` | Fresh-process harness and one-shot worker. |
 | `bench/setup_data.py`, `bench/common.py` | Table generation and connection factories. |
 | `bench/parity.py`, `tests/` | Live type-parity comparison and constructor tests. |
@@ -133,7 +144,7 @@ just parity             # writes results/type-parity.json
 ```
 
 The commands that produced the committed snapshots (2026-11-10), against the
-older pin, are unchanged. They were not re-run on `7d715a8`:
+older pin, are unchanged. They were not re-run on `14365bb`:
 
 ```bash
 # 100k × 5 rounds and 1M × 3 rounds; all backends × all paths.
@@ -181,7 +192,7 @@ the snapshot is the old pin; the patch in this branch applies to the commit in
 | Component | Version |
 |---|---|
 | apache/superset (snapshot) | `a131fcb623d88ed9eb7e7a414e226437423d645c` + the patch as of that run |
-| apache/superset (this branch) | `7d715a82a69a40389d0f4ce20f0e8ccfb17ce889` + `patches/0001-arrow-native-result-set.patch` |
+| apache/superset (this branch) | `14365bbebd3ecfb3d9a0c1304908248d5fbeb3d4` + `patches/0001-arrow-native-result-set.patch` |
 | pyarrow | 26.0.1 |
 | SQLAlchemy | 2.0.57 |
 | duckdb / duckdb-engine | 1.5.6 / 0.17.0 |
@@ -277,7 +288,7 @@ with more headroom could rerun with a higher `--max-rss-gb`.
   the commit in `SUPERSET_COMMIT` and is documented in `patches/README.md`.
   Behaviour can still move if this is proposed upstream later.
 - **The snapshot figures are from 2026-11-10**, on the previous pin. They are
-  not a measurement of `7d715a8`. If a number from that run no longer describes
+  not a measurement of `14365bb` (or of `7d715a8`). If a number from that run no longer describes
   the retargeted code, this README says so instead of guessing. The ADBC
   `fetch_record_batch` → `from_arrow` → IPC sequence that produced `total (IPC)`
   is still the harness's Arrow path.
