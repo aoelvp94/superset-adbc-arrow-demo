@@ -4,9 +4,9 @@ Prints a single JSON line. Run through bench/run_bench.py.
 
 Stages (wall clock, perf_counter):
   fetch      cursor.execute + fetch (rows: engine_spec.fetch_data,
-             arrow: engine_spec.fetch_arrow -> fetch_record_batch)
+             arrow: engine_spec.fetch_arrow; ADBC uses fetch_record_batch)
   result_set SupersetResultSet(...) or SupersetResultSet.from_arrow(...),
-             plus .columns (what SQL Lab sends as column metadata)
+             plus .columns (column metadata on the result set)
   ipc        superset.sqllab.utils.write_ipc_buffer(pa_table)  (the
              RESULTS_BACKEND_USE_MSGPACK=True path, Superset's default)
   pandas     result_set.to_pandas_df()  (Superset's own pandas conversion for

@@ -1,124 +1,216 @@
 diff --git a/pyproject.toml b/pyproject.toml
-index 1617b46..cd5dd1f 100644
+index f556297..9da794e 100644
 --- a/pyproject.toml
 +++ b/pyproject.toml
 @@ -165,6 +165,9 @@ databricks = [
      "databricks-sqlalchemy>=2.0.1, <3",
  ]
  datafusion = ["flightsql-dbapi>=0.2.2, <0.3"]
-+# Generic Arrow Flight SQL over ADBC (sketch). sqlalchemy-adbc needs Python
-+# >= 3.12, so the marker keeps the extra resolvable on 3.11.
++# Optional sketch for a generic Flight SQL engine spec. sqlalchemy-adbc needs
++# Python >= 3.12. ``SupersetResultSet.from_arrow`` does not depend on this extra.
 +flightsql = ["sqlalchemy-adbc[flightsql]>=0.9.5, <1; python_version >= '3.12'"]
  db2 = ["ibm-db-sa<=0.4.4, >=0.4.4"]
  denodo = ["denodo-sqlalchemy>=2.0.5,<2.1.0"]
  # sqlalchemy-dremio 3.0.5+ hard-pins sqlalchemy~=2.0.41, dropping 1.4.
 diff --git a/superset/config.py b/superset/config.py
-index 0b82cc9..b3896fc 100644
+index 23d2ef8..3da7444 100644
 --- a/superset/config.py
 +++ b/superset/config.py
-@@ -878,6 +878,10 @@ DEFAULT_FEATURE_FLAGS: dict[str, bool] = {
+@@ -878,6 +878,11 @@ DEFAULT_FEATURE_FLAGS: dict[str, bool] = {
      # Requires `cost_estimate_enabled: true` in database `extra` attribute.
      # @lifecycle: testing
      "ESTIMATE_QUERY_COST": False,
-+    # Build SQL Lab result sets from Arrow (ADBC fetch_record_batch) instead of
-+    # Python rows when the engine spec and cursor support it.
++    # Global rollback for Arrow ingest into SupersetResultSet. Engines opt in
++    # one at a time via ``supports_arrow_result``; off leaves every engine on
++    # ``fetch_data``. The row path stays the default either way.
 +    # @lifecycle: development
 +    "ARROW_NATIVE_RESULT_SET": False,
      # Enable async queries for dashboards and Explore via WebSocket.
      # Requires Redis 5.0+ and Celery workers.
      # @lifecycle: testing
 diff --git a/superset/db_engine_specs/base.py b/superset/db_engine_specs/base.py
-index 6ea2bd1..ed20e0f 100644
+index 6ea2bd1..9adcb48 100644
 --- a/superset/db_engine_specs/base.py
 +++ b/superset/db_engine_specs/base.py
-@@ -41,6 +41,7 @@ from urllib.parse import urlencode, urljoin, urlparse
- from uuid import UUID, uuid4
- 
- import pandas as pd
-+import pyarrow as pa
- from apispec import APISpec
- from apispec.ext.marshmallow import MarshmallowPlugin
- from celery.exceptions import SoftTimeLimitExceeded
-@@ -739,6 +740,11 @@ class BaseEngineSpec:  # pylint: disable=too-many-public-methods
+@@ -739,6 +739,16 @@ class BaseEngineSpec:  # pylint: disable=too-many-public-methods
      # fetched for cursor.description to be populated.
      type_probe_needs_row: bool = False
      requires_column_value_normalization: bool = False
-+    # Opt-in: the engine's DB-API driver may return Arrow natively (ADBC
-+    # cursors expose ``fetch_record_batch``). When the cursor in use has no
-+    # Arrow fetch (e.g. psycopg2), ``fetch_arrow`` returns None and callers
-+    # fall back to ``fetch_data``.
-+    supports_arrow_fetch: bool = False
++    # Opt in to building ``SupersetResultSet`` from a ``pyarrow.Table``.
++    # Default False: the row path (``fetch_data`` / ``fetchall``) stays the
++    # default and the fallback. An engine that can already produce Arrow sets
++    # this True. The cursor still has to expose an Arrow fetch
++    # (``fetch_record_batch``, ``to_arrow_reader``, ``fetch_arrow_table``, or
++    # ``to_arrow_table``); a cursor that cannot, such as psycopg2, keeps the
++    # row path. ADBC is one such cursor, not a requirement.
++    # ``maybe_fetch_arrow`` also requires the ``ARROW_NATIVE_RESULT_SET``
++    # feature flag, which is the global rollback and defaults to off.
++    supports_arrow_result: bool = False
      try_remove_schema_from_table_name = True  # pylint: disable=invalid-name
      run_multiple_statements_as_one = False
      custom_errors: dict[
-@@ -1767,6 +1773,47 @@ class BaseEngineSpec:  # pylint: disable=too-many-public-methods
+@@ -1767,6 +1777,139 @@ class BaseEngineSpec:  # pylint: disable=too-many-public-methods
          except Exception as ex:
              raise cls.get_dbapi_mapped_exception(ex) from ex
  
 +    @classmethod
-+    def fetch_arrow(cls, cursor: Any, limit: int | None = None) -> pa.Table | None:
++    def maybe_fetch_arrow(cls, cursor: Any, limit: int | None = None) -> Any:
 +        """
-+        Fetch the result as an Arrow table without building Python rows.
++        Return an Arrow table only when ingest is allowed for this query.
 +
-+        :param cursor: Cursor instance
-+        :param limit: Maximum number of rows to be returned by the cursor
-+        :return: Arrow table, or None when the cursor cannot fetch Arrow
++        The feature flag is a global rollback (default off). The engine spec
++        must also opt in via ``supports_arrow_result``. Otherwise, and when
++        the cursor cannot produce a Table, returns ``None`` and the caller
++        keeps ``fetch_data``. Does not consume the cursor when it returns
++        ``None`` before fetching.
++
++        :param cursor: DB-API cursor positioned on a result
++        :param limit: Maximum number of rows, or None for the whole result
++        :return: ``pyarrow.Table``, or None to use the row path
 +        """
-+        if not cls.supports_arrow_fetch or not hasattr(cursor, "fetch_record_batch"):
++        # Local import: this module is imported while the app package loads.
++        from superset import is_feature_enabled
++
++        if not is_feature_enabled("ARROW_NATIVE_RESULT_SET"):
++            return None
++        return cls.fetch_arrow(cursor, limit)
++
++    @classmethod
++    def fetch_arrow(cls, cursor: Any, limit: int | None = None) -> Any:
++        """
++        Fetch the result as an Arrow table, without building Python rows.
++
++        Honors ``supports_arrow_result`` only. Callers that also need the
++        feature-flag rollback use ``maybe_fetch_arrow``. ADBC is not required:
++        any cursor that exposes one of the methods below is accepted, and a
++        cursor that exposes none returns ``None``.
++
++        :param cursor: DB-API cursor positioned on a result
++        :param limit: Maximum number of rows, or None for the whole result
++        :return: ``pyarrow.Table``, or None when this engine or cursor cannot
++        """
++        if not cls.supports_arrow_result:
++            return None
++        reader_method = cls._arrow_reader_method(cursor)
++        table_method = cls._arrow_table_method(cursor)
++        if reader_method is None and table_method is None:
 +            return None
 +        try:
++            # Drivers that fill ``description`` only while fetching have
++            # nothing to read as Arrow yet; the caller falls back to
++            # ``fetch_data``, which populates the description.
 +            if not cursor.description:
 +                return None
-+            reader = cursor.fetch_record_batch()
-+            if limit is None:
-+                return reader.read_all()
-+            batches: list[pa.RecordBatch] = []
-+            fetched = 0
-+            for batch in reader:
-+                batches.append(batch)
-+                fetched += batch.num_rows
-+                if fetched >= limit:
-+                    break
-+            return pa.Table.from_batches(batches, schema=reader.schema).slice(0, limit)
++            if reader_method is not None:
++                return cls._table_from_arrow_reader(reader_method(), limit)
++            table = table_method()
++            if limit is not None:
++                return table.slice(0, limit)
++            return table
 +        except Exception as ex:
 +            raise cls.get_dbapi_mapped_exception(ex) from ex
 +
++    @staticmethod
++    def _arrow_reader_method(cursor: Any) -> Any:
++        """
++        Streaming Arrow fetch, if the cursor has one.
++
++        DuckDB's current name is ``to_arrow_reader`` (``fetch_record_batch``
++        is a deprecated alias, so it is not used when the current name
++        exists). ADBC exposes ``fetch_record_batch`` and not ``to_arrow_reader``.
++        """
++        if hasattr(cursor, "to_arrow_reader"):
++            return cursor.to_arrow_reader
++        if hasattr(cursor, "fetch_record_batch"):
++            return cursor.fetch_record_batch
++        return None
++
++    @staticmethod
++    def _arrow_table_method(cursor: Any) -> Any:
++        if hasattr(cursor, "to_arrow_table"):
++            return cursor.to_arrow_table
++        if hasattr(cursor, "fetch_arrow_table"):
++            return cursor.fetch_arrow_table
++        return None
++
++    @staticmethod
++    def _table_from_arrow_reader(reader: Any, limit: int | None) -> Any:
++        # Local import: see ``maybe_fetch_arrow``.
++        import pyarrow as pa
++
++        if isinstance(reader, pa.Table):
++            return reader if limit is None else reader.slice(0, limit)
++        if isinstance(reader, pa.RecordBatch):
++            table = pa.Table.from_batches([reader])
++            return table if limit is None else table.slice(0, limit)
++        if limit is None and hasattr(reader, "read_all"):
++            return reader.read_all()
++        schema = getattr(reader, "schema", None)
++        if limit is not None and limit <= 0 and schema is not None:
++            return pa.Table.from_batches([], schema=schema)
++        batches: list[Any] = []
++        fetched = 0
++        for batch in reader:
++            batches.append(batch)
++            fetched += batch.num_rows
++            if limit is not None and fetched >= limit:
++                break
++        if not batches:
++            if schema is None:
++                return pa.table({})
++            return pa.Table.from_batches([], schema=schema)
++        table = pa.Table.from_batches(batches, schema=schema or batches[0].schema)
++        if limit is not None:
++            return table.slice(0, limit)
++        return table
++
 +    @classmethod
-+    def get_datatype_from_arrow_field(cls, field: pa.Field) -> str | None:
++    def get_datatype_from_arrow_field(cls, field: Any) -> str | None:
 +        """
-+        Database type name for an Arrow field, used where the row path calls
-+        ``get_datatype(cursor.description[i][1])``. ADBC drivers carry the
-+        native type in field metadata (e.g. ``POSTGRESQL:type``); without it
-+        the type is inferred from the Arrow type, as the row path does.
++        Database type name for an Arrow field.
++
++        Used where the row path calls ``get_datatype(cursor.description[i][1])``.
++        Drivers that know the native type put it in field metadata under a
++        ``<VENDOR>:type`` key (ADBC does this). Without that metadata the
++        caller infers a type from the Arrow type. Returning None is safe.
++
++        :param field: ``pyarrow.Field``
++        :return: Type string, or None
 +        """
-+        for key, value in (field.metadata or {}).items():
-+            if key.endswith(b":type"):
-+                return value.decode("utf-8").upper()
++        metadata = getattr(field, "metadata", None) or {}
++        for key, value in metadata.items():
++            key_text = key.decode() if isinstance(key, bytes) else str(key)
++            if key_text.endswith(":type"):
++                if isinstance(value, bytes):
++                    return value.decode().upper()
++                return str(value).upper()
 +        return None
 +
      @classmethod
      def fetch_data_with_cursor(
          cls,
 diff --git a/superset/db_engine_specs/duckdb.py b/superset/db_engine_specs/duckdb.py
-index aaa6a27..6f8535b 100644
+index aaa6a27..6e1ab5f 100644
 --- a/superset/db_engine_specs/duckdb.py
 +++ b/superset/db_engine_specs/duckdb.py
-@@ -198,6 +198,9 @@ class DuckDBParametersMixin:
+@@ -198,6 +198,11 @@ class DuckDBParametersMixin:
  
  class DuckDBEngineSpec(DuckDBParametersMixin, BaseEngineSpec):
      engine = "duckdb"
-+    # Arrow fetch when connected through adbc_driver_duckdb (the duckdb-engine
-+    # cursor has no fetch_record_batch and keeps the row path).
-+    supports_arrow_fetch = True
++    # DuckDB can return a Table (``to_arrow_reader`` / ``to_arrow_table``)
++    # without ADBC. Inherited by MotherDuck. The feature flag
++    # ``ARROW_NATIVE_RESULT_SET`` still defaults off, and a cursor with no
++    # Arrow fetch keeps ``fetch_data``.
++    supports_arrow_result = True
      engine_name = "DuckDB"
      default_driver = "duckdb_engine"
  
 diff --git a/superset/db_engine_specs/flightsql.py b/superset/db_engine_specs/flightsql.py
 new file mode 100644
-index 0000000..4b7e4f5
+index 0000000..e78d70e
 --- /dev/null
 +++ b/superset/db_engine_specs/flightsql.py
-@@ -0,0 +1,99 @@
+@@ -0,0 +1,108 @@
 +# Licensed to the Apache Software Foundation (ASF) under one
 +# or more contributor license agreements.  See the NOTICE file
 +# distributed with this work for additional information
@@ -136,19 +228,22 @@ index 0000000..4b7e4f5
 +# specific language governing permissions and limitations
 +# under the License.
 +"""
-+Generic Arrow Flight SQL engine spec over ADBC (SKETCH, not production-ready).
++Generic Arrow Flight SQL engine spec (sketch, not a finished integration).
 +
-+Connects through ``sqlalchemy-adbc`` (``flightsql+adbc://``), whose DB-API
-+cursor is an ADBC cursor, so result sets can be built with
-+``SupersetResultSet.from_arrow`` (``supports_arrow_fetch``). Flight SQL is a
-+protocol, not an engine: the server behind it may be DuckDB (GizmoSQL),
-+DataFusion, Dremio, Doris, InfluxDB 3, ... so the time grains below stay on
-+ANSI ``DATE_TRUNC``; engine-specific specs (e.g. DataFusion) can subclass.
++``SupersetResultSet.from_arrow`` does not depend on this module. Flight SQL
++is one engine that can already produce a ``pyarrow.Table``. ADBC
++(``flightsql+adbc://`` via ``sqlalchemy-adbc``) is one driver that does so;
++it is not required to use the constructor. ``supports_arrow_result`` opts
++this engine in. The ``ARROW_NATIVE_RESULT_SET`` feature flag still defaults
++off, and a cursor with no Arrow fetch stays on ``fetch_data``.
 +
-+Open points (see README of the benchmark repo):
++Open points:
 +* sqlalchemy-adbc requires Python >= 3.12; Superset still supports 3.11.
 +* reflection (table list, column types) is reported broken in #45937.
 +"""
++
++from datetime import datetime
++from typing import Any
 +
 +from sqlalchemy import types
 +
@@ -158,16 +253,17 @@ index 0000000..4b7e4f5
 +
 +class FlightSQLEngineSpec(BaseEngineSpec):
 +    engine = "flightsql"
-+    engine_name = "Arrow Flight SQL (ADBC)"
++    engine_name = "Arrow Flight SQL"
 +    drivers = {"adbc": "ADBC Flight SQL driver via sqlalchemy-adbc"}
 +    default_driver = "adbc"
 +    sqlalchemy_uri_placeholder = "flightsql+adbc://user:password@host:port"
 +    supports_file_upload = False
-+    supports_arrow_fetch = True
++    supports_arrow_result = True
 +
 +    metadata = {
 +        "description": (
-+            "Any Arrow Flight SQL server, through the ADBC Flight SQL driver."
++            "Any Arrow Flight SQL server. ADBC is one driver that can return "
++            "a Table; the result-set constructor does not require it."
 +        ),
 +        "homepage_url": "https://arrow.apache.org/adbc/",
 +        "categories": [
@@ -179,7 +275,7 @@ index 0000000..4b7e4f5
 +        "connection_string": "flightsql+adbc://{username}:{password}@{host}:{port}",
 +        "drivers": [
 +            {
-+                "name": "ADBC Flight SQL (Recommended)",
++                "name": "ADBC Flight SQL",
 +                "pypi_package": "sqlalchemy-adbc[flightsql]",
 +                "connection_string": (
 +                    "flightsql+adbc://{username}:{password}@{host}:{port}"
@@ -187,6 +283,10 @@ index 0000000..4b7e4f5
 +                "is_recommended": True,
 +            }
 +        ],
++        "notes": (
++            "Sketch. Time grains use ANSI DATE_TRUNC because the server behind "
++            "Flight SQL may be DuckDB, DataFusion, or something else."
++        ),
 +    }
 +
 +    _time_grain_expressions = {
@@ -209,45 +309,40 @@ index 0000000..4b7e4f5
 +    def convert_dttm(
 +        cls,
 +        target_type: str,
-+        dttm,
-+        db_extra=None,  # type: ignore[no-untyped-def]
++        dttm: datetime,
++        db_extra: dict[str, Any] | None = None,
 +    ) -> str | None:
 +        sqla_type = cls.get_sqla_column_type(target_type)
 +        if isinstance(sqla_type, types.Date):
 +            return f"DATE '{dttm.date().isoformat()}'"
-+        if isinstance(sqla_type, types.TIMESTAMP):
-+            return f"""TIMESTAMP '{dttm.isoformat(sep=" ", timespec="microseconds")}'"""
++        if isinstance(sqla_type, (types.DateTime, types.TIMESTAMP)):
++            rendered = dttm.isoformat(sep=" ", timespec="microseconds")
++            return f"TIMESTAMP '{rendered}'"
 +        return None
 diff --git a/superset/db_engine_specs/postgres.py b/superset/db_engine_specs/postgres.py
-index 273df33..1261abc 100644
+index 273df33..debaebc 100644
 --- a/superset/db_engine_specs/postgres.py
 +++ b/superset/db_engine_specs/postgres.py
-@@ -24,6 +24,7 @@ from datetime import datetime
- from re import Pattern
- from typing import Any, Callable, Optional, TYPE_CHECKING
- 
-+import pyarrow as pa
- import sqlalchemy as sa
- from flask_babel import gettext as __
- from marshmallow import fields, pre_load
-@@ -453,6 +454,9 @@ POSTGRES_TEMPORAL_LITERAL_FORMATS = (
+@@ -453,6 +453,11 @@ POSTGRES_TEMPORAL_LITERAL_FORMATS = (
  
  class PostgresEngineSpec(BasicParametersMixin, PostgresBaseEngineSpec):
      engine = "postgresql"
-+    # Arrow fetch when connected through adbc-driver-postgresql (psycopg2
-+    # cursors have no fetch_record_batch and keep the row path).
-+    supports_arrow_fetch = True
++    # psycopg2 has no Arrow fetch and stays on ``fetch_data``. A cursor that
++    # can return a Table (ADBC PostgreSQL, or any other) is used only when
++    # ``ARROW_NATIVE_RESULT_SET`` is also on. ADBC is not required to construct
++    # a result set with ``SupersetResultSet.from_arrow``.
++    supports_arrow_result = True
      engine_name = "PostgreSQL"
      engine_aliases = {"postgres"}
  
-@@ -1167,6 +1171,58 @@ WHERE datistemplate = false;
+@@ -1167,6 +1172,61 @@ WHERE datistemplate = false;
              extra["engine_params"] = engine_params
          return extra
  
 +    # Built-in type OIDs (stable across PostgreSQL versions) for the type
-+    # names that adbc-driver-postgresql puts in ``POSTGRESQL:type`` field
-+    # metadata, so the Arrow path reports the same type strings as the
-+    # psycopg2 row path (``get_datatype(cursor.description[i].type_code)``).
++    # names adbc-driver-postgresql puts in ``POSTGRESQL:type`` field metadata,
++    # so an Arrow result reports the same type strings as the psycopg2 row
++    # path (``get_datatype(cursor.description[i].type_code)``).
 +    _ADBC_TYPNAME_OIDS = {
 +        "bool": 16,
 +        "bytea": 17,
@@ -284,23 +379,86 @@ index 273df33..1261abc 100644
 +    }
 +
 +    @classmethod
-+    def get_datatype_from_arrow_field(cls, field: pa.Field) -> str | None:
-+        typname = (field.metadata or {}).get(b"POSTGRESQL:type")
++    def get_datatype_from_arrow_field(cls, field: Any) -> str | None:
++        metadata = getattr(field, "metadata", None) or {}
++        typname = metadata.get(b"POSTGRESQL:type")
 +        if typname is None:
 +            return None
-+        oid = cls._ADBC_TYPNAME_OIDS.get(typname.decode("utf-8"))
++        if isinstance(typname, bytes):
++            typname = typname.decode("utf-8")
++        oid = cls._ADBC_TYPNAME_OIDS.get(typname)
 +        if oid is None:
 +            return None
 +        try:
 +            return cls.get_datatype(oid)
 +        except ImportError:  # ADBC-only install, no psycopg2
-+            return typname.decode("utf-8").upper()
++            return typname.upper()
 +
      @classmethod
      def get_datatype(cls, type_code: Any) -> str | None:
          # pylint: disable=import-outside-toplevel
+diff --git a/superset/models/core.py b/superset/models/core.py
+index 2b56305..583ec79 100755
+--- a/superset/models/core.py
++++ b/superset/models/core.py
+@@ -1193,8 +1193,9 @@ class Database(CoreDatabase, AuditMixinNullable, ImportExportMixin):  # pylint:
+         :param catalog: Optional catalog name
+         :param schema: Optional schema name
+         :param fetch_last_result: Whether to fetch results from last statement
+-        :return: Tuple of (cursor, rows, description) where rows and description
+-        are None if not fetching.
++        :return: Tuple of (cursor, rows, description). ``rows`` is a list of
++        tuples, or a ``pyarrow.Table`` when this engine opted into Arrow ingest
++        and the cursor could produce one. Both are None when not fetching.
+         """
+         script = SQLScript(sql, self.db_engine_spec.engine)
+ 
+@@ -1260,11 +1261,18 @@ class Database(CoreDatabase, AuditMixinNullable, ImportExportMixin):  # pylint:
+                         query_executed()
+                         notify_cursor(cursor, self, CursorPhase.SUBMITTED)
+ 
+-                    # Fetch results from last statement if requested
++                    # Fetch results from last statement if requested.
++                    # Arrow ingest is opt-in: ``maybe_fetch_arrow`` returns
++                    # None unless ARROW_NATIVE_RESULT_SET is on, this engine
++                    # set ``supports_arrow_result``, and the cursor can produce
++                    # a Table. Otherwise the row path is unchanged.
+                     if fetch_last_result and i == len(script.statements) - 1:
+-                        rows = self.db_engine_spec.fetch_data(cursor)
+-                        # Some asynchronous DB-API drivers expose placeholder metadata
+-                        # until fetching waits for the operation to finish.
++                        rows = self.db_engine_spec.maybe_fetch_arrow(cursor)
++                        if rows is None:
++                            rows = self.db_engine_spec.fetch_data(cursor)
++                        # Some asynchronous DB-API drivers expose placeholder
++                        # metadata until fetching waits for the operation to
++                        # finish.
+                         description = cursor.description
+                     else:
+                         # Consume results without storing
+@@ -1311,7 +1319,19 @@ class Database(CoreDatabase, AuditMixinNullable, ImportExportMixin):  # pylint:
+ 
+         df = None
+         if rows is not None:
+-            df = self.load_into_dataframe(description, rows)
++            # ``maybe_fetch_arrow`` may have returned a Table. The chart path
++            # still materializes a DataFrame afterwards; this only changes how
++            # the result set is built. The wire format is unchanged.
++            import pyarrow as pa
++
++            from superset.result_set import SupersetResultSet
++
++            if isinstance(rows, pa.Table):
++                df = SupersetResultSet.from_arrow(
++                    rows, self.db_engine_spec
++                ).to_pandas_df()
++            else:
++                df = self.load_into_dataframe(description, rows)
+ 
+         if mutator:
+             df = mutator(df)
 diff --git a/superset/result_set.py b/superset/result_set.py
-index 3251de7..6e3ab06 100644
+index 3251de7..cb34663 100644
 --- a/superset/result_set.py
 +++ b/superset/result_set.py
 @@ -24,6 +24,7 @@ from typing import Any, Optional
@@ -311,20 +469,21 @@ index 3251de7..6e3ab06 100644
  from numpy.typing import NDArray
  
  from superset.db_engine_specs import BaseEngineSpec
-@@ -141,6 +142,71 @@ def stringify_extension_columns(table: pa.Table) -> pa.Table:
+@@ -141,6 +142,91 @@ def stringify_extension_columns(table: pa.Table) -> pa.Table:
      return table
  
  
 +def _opaque_numeric_to_decimal(column: pa.ChunkedArray) -> pa.ChunkedArray:
 +    """
-+    Cast an ``arrow.opaque`` NUMERIC column (string storage, as returned by the
-+    ADBC PostgreSQL driver) to a decimal type, matching the row path, which
-+    receives ``Decimal`` objects from psycopg2.
++    Cast an ``arrow.opaque`` NUMERIC column (string storage) to a decimal type.
 +
-+    * NaN / Infinity become NULL, as ``stringify_values`` does on the row path
-+      ("NaN and Infinity have no exact value").
-+    * ``decimal128(38, s)`` is tried first, then ``decimal256(76, s)``; values
-+      that fit neither keep their exact string form.
++    Some drivers, including the ADBC PostgreSQL driver, return NUMERIC as text
++    rather than as ``decimal128``. The row path receives ``Decimal`` objects.
++
++    * NaN / Infinity become NULL, as ``stringify_values`` does for a
++      non-finite ``Decimal`` ("NaN and Infinity have no exact value").
++    * ``decimal128(38, s)`` is tried first, then ``decimal256(76, s)``.
++      Values that fit neither keep their exact string form.
 +    """
 +    storage = pa.chunked_array(
 +        [chunk.storage for chunk in column.chunks], type=column.type.storage_type
@@ -351,10 +510,10 @@ index 3251de7..6e3ab06 100644
 +
 +def _uuid_to_string(column: pa.ChunkedArray) -> pa.ChunkedArray:
 +    """
-+    Vectorized ``arrow.uuid`` -> canonical 36-char string (same output as
-+    ``str(uuid.UUID)``). ``stringify_extension_columns`` does this with a
-+    Python loop over ``to_pylist()``, which dominated the Arrow path on
-+    PostgreSQL uuid columns.
++    Vectorized ``arrow.uuid`` to the canonical 36-character string.
++
++    ``stringify_extension_columns`` does this with a Python loop over
++    ``to_pylist()``. The bytes are the same as ``str(uuid.UUID)``.
 +    """
 +    chunks = []
 +    for chunk in column.chunks:
@@ -380,19 +539,38 @@ index 3251de7..6e3ab06 100644
 +    return pa.chunked_array(chunks, type=pa.string())
 +
 +
++def _uint64_over_int64_to_string(column: pa.ChunkedArray) -> pa.ChunkedArray:
++    """
++    Stringify a uint64 column when any value does not fit in int64.
++
++    ``fetchall`` returns Python ints. ``pa.array`` raises ``OverflowError``
++    above 2**63 - 1 and the row constructor then stringifies that whole
++    column (see ``test_integers_outside_int64_are_stringified``). Values that
++    fit stay uint64; the row path would infer int64, which is the same width
++    difference already accepted for int32.
++    """
++    if len(column) == 0:
++        return column
++    limit = pa.scalar(2**63 - 1, type=column.type)
++    exceeds = pc.fill_null(pc.greater(column, limit), False)
++    if pc.any(exceeds).as_py():
++        return pc.cast(column, pa.string())
++    return column
++
++
  def convert_to_string(value: Any) -> str:
      """
      Used to ensure column names from the cursor description are strings.
-@@ -205,6 +271,8 @@ class SupersetResultSet:
+@@ -205,6 +291,8 @@ class SupersetResultSet:
          stringified_arr: NDArray[Any]
          # Track columns with nested/JSON data to preserve them as objects
          self._nested_columns: dict[str, list[Any]] = {}
-+        # Arrow-native path only: JSON text columns parsed on first access
++        # Arrow-native path only: JSON text parsed on first sync access.
 +        self._lazy_json_columns: dict[str, pa.ChunkedArray] = {}
  
          if cursor_description:
              # get deduped list of column names
-@@ -330,6 +398,111 @@ class SupersetResultSet:
+@@ -330,6 +418,129 @@ class SupersetResultSet:
          except Exception as ex:  # pylint: disable=broad-except
              logger.exception(ex)
  
@@ -405,23 +583,27 @@ index 3251de7..6e3ab06 100644
 +        truncated: bool = False,
 +    ) -> "SupersetResultSet":
 +        """
-+        Build a result set straight from an Arrow table (e.g. an ADBC cursor's
-+        ``fetch_arrow_table()``), without materializing Python rows.
++        Build a result set from a ``pyarrow.Table``.
 +
-+        Mirrors the normalization the row-based constructor applies, column by
-+        column and in Arrow compute where possible:
++        The table may come from any producer: an ADBC cursor, DuckDB's
++        ``to_arrow_table``, Flight SQL, or a SQLAlchemy execution that already
++        returned a Table. ADBC is not required, and this constructor does not
++        fetch anything.
 +
-+        * column names are normalized and de-duplicated the same way;
++        Normalization follows the row constructor, column by column:
++
++        * names are normalized and de-duplicated the same way;
 +        * dictionary-encoded columns are decoded (the row path never sees
 +          categoricals);
-+        * PostgreSQL ``arrow.opaque`` NUMERIC becomes ``decimal128``;
-+        * ``arrow.json`` keeps the server's JSON text, and its parsed objects
-+          are exposed through ``nested_columns`` lazily, so the msgpack/IPC
-+          path never parses JSON;
-+        * nested Arrow types (list/struct/map) are stringified as JSON and
-+          their Python values kept in ``nested_columns``;
-+        * ``arrow.uuid`` is stringified vectorized; remaining extension types
-+          go through ``stringify_extension_columns`` as on the row path.
++        * ``arrow.opaque`` NUMERIC becomes a decimal, with NaN/Infinity NULL;
++        * ``arrow.json`` keeps the server's JSON text and parses objects
++          lazily through ``nested_columns`` / ``to_pandas_df()``;
++        * nested list/struct/map values are stringified as JSON and kept in
++          ``nested_columns``, as the row path does for list/dict cells;
++        * ``arrow.uuid`` is stringified; other extension types still go
++          through ``stringify_extension_columns``;
++        * uint64 values above 2**63 - 1 stringify the column, matching the
++          row constructor's ``OverflowError`` fallback.
 +        """
 +        result_set = cls.__new__(cls)
 +        result_set.truncated = truncated
@@ -441,8 +623,20 @@ index 3251de7..6e3ab06 100644
 +        for index, field in enumerate(table.schema):
 +            column = table.column(index)
 +            name = column_names[index]
++            logical_type = (
++                field.type.value_type
++                if pa.types.is_dictionary(field.type)
++                else field.type
++            )
++            # Vendor metadata wins, same as a cursor description. Otherwise use
++            # the same Arrow-type names as ``convert_pa_dtype`` (what the row
++            # path uses when the cursor type is missing). Captured before
++            # normalization so a uint64 column stringified for overflow still
++            # reports INT, matching a cursor type of int.
 +            if db_type := db_engine_spec.get_datatype_from_arrow_field(field):
 +                type_dict[name] = db_type
++            elif inferred := cls.convert_pa_dtype(logical_type):
++                type_dict[name] = inferred
 +            column = result_set._normalize_arrow_column(name, field, column)
 +            if column is not table.column(index):
 +                table = table.set_column(index, name, column)
@@ -454,9 +648,10 @@ index 3251de7..6e3ab06 100644
 +    def _normalize_arrow_column(
 +        self, name: str, field: pa.Field, column: pa.ChunkedArray
 +    ) -> pa.ChunkedArray:
-+        """Per-column normalization for ``from_arrow`` (see its docstring)."""
++        """Per-column normalization for ``from_arrow``."""
 +        if pa.types.is_dictionary(field.type):
-+            return column.cast(field.type.value_type)
++            column = column.cast(field.type.value_type)
++            field = field.with_type(field.type.value_type)
 +        if isinstance(field.type, pa.BaseExtensionType):
 +            extension_name = getattr(field.type, "extension_name", "")
 +            if extension_name == "arrow.json":
@@ -472,7 +667,6 @@ index 3251de7..6e3ab06 100644
 +                return _opaque_numeric_to_decimal(column)
 +            if extension_name == "arrow.uuid":
 +                return _uuid_to_string(column)
-+            # anything else is handled by stringify_extension_columns
 +            return column
 +        if pa.types.is_nested(field.type):
 +            values = column.to_pylist()
@@ -488,6 +682,8 @@ index 3251de7..6e3ab06 100644
 +                    )
 +                ]
 +            )
++        if pa.types.is_unsigned_integer(field.type) and field.type.bit_width == 64:
++            return _uint64_over_int64_to_string(column)
 +        return column
 +
 +    def _materialize_lazy_json_columns(self) -> None:
@@ -504,7 +700,7 @@ index 3251de7..6e3ab06 100644
      @staticmethod
      def convert_pa_dtype(pa_dtype: pa.DataType) -> Optional[str]:
          if pa.types.is_boolean(pa_dtype):
-@@ -380,6 +553,7 @@ class SupersetResultSet:
+@@ -380,6 +591,7 @@ class SupersetResultSet:
          return self.db_engine_spec.resolve_column_type(set_type, pa_mapped)
  
      def to_pandas_df(self) -> pd.DataFrame:
@@ -512,7 +708,7 @@ index 3251de7..6e3ab06 100644
          df = self.convert_table_to_df(self.table)
          # Restore nested/JSON columns as Python objects instead of strings
          # This allows JSON data to be used directly in templates like Handlebars.
-@@ -393,6 +567,7 @@ class SupersetResultSet:
+@@ -393,6 +605,7 @@ class SupersetResultSet:
      @property
      def nested_columns(self) -> dict[str, list[Any]]:
          """Original nested values restored by the synchronous DataFrame path."""
@@ -520,62 +716,12 @@ index 3251de7..6e3ab06 100644
          return self._nested_columns
  
      @property
-diff --git a/superset/sql_lab.py b/superset/sql_lab.py
-index 3e619cc..669fce8 100644
---- a/superset/sql_lab.py
-+++ b/superset/sql_lab.py
-@@ -346,6 +346,7 @@ def _execute_query(
-     """Run a statement inside the engine's interruption-safe cursor scope."""
-     database = query.database
-     db_engine_spec = database.db_engine_spec
-+    arrow_table = None
-     try:
-         log_query = app.config["QUERY_LOGGER"]
-         if log_query:
-@@ -382,12 +383,23 @@ def _execute_query(
-                     str(query.to_dict()),
-                 )
-                 increased_limit = None if query.limit is None else query.limit + 1
--                data = db_engine_spec.fetch_data(cursor, increased_limit)
--                if query.limit is None or len(data) <= query.limit:
--                    query.limiting_factor = LimitingFactor.NOT_LIMITED
-+                arrow_table = (
-+                    db_engine_spec.fetch_arrow(cursor, increased_limit)
-+                    if is_feature_enabled("ARROW_NATIVE_RESULT_SET")
-+                    else None
-+                )
-+                if arrow_table is not None:
-+                    if query.limit is None or arrow_table.num_rows <= query.limit:
-+                        query.limiting_factor = LimitingFactor.NOT_LIMITED
-+                    else:
-+                        arrow_table = arrow_table.slice(0, query.limit)
-                 else:
--                    # return 1 row less than increased_query
--                    data = data[:-1]
-+                    data = db_engine_spec.fetch_data(cursor, increased_limit)
-+                    if query.limit is None or len(data) <= query.limit:
-+                        query.limiting_factor = LimitingFactor.NOT_LIMITED
-+                    else:
-+                        # return 1 row less than increased_query
-+                        data = data[:-1]
-     except SoftTimeLimitExceeded as ex:
-         query.status = QueryStatus.TIMED_OUT
- 
-@@ -417,6 +429,8 @@ def _execute_query(
-         logger.debug("Query %d: %s", query.id, ex)
-         raise SqlLabException(db_engine_spec.extract_error_message(ex)) from ex
- 
-+    if arrow_table is not None:
-+        return SupersetResultSet.from_arrow(arrow_table, db_engine_spec)
-     logger.debug("Query %d: Fetching cursor description", query.id)
-     cursor_description = cursor.description
-     return SupersetResultSet(data, cursor_description, db_engine_spec)
 diff --git a/tests/unit_tests/result_set_from_arrow_test.py b/tests/unit_tests/result_set_from_arrow_test.py
 new file mode 100644
-index 0000000..7979e8f
+index 0000000..66c4c86
 --- /dev/null
 +++ b/tests/unit_tests/result_set_from_arrow_test.py
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,347 @@
 +# Licensed to the Apache Software Foundation (ASF) under one
 +# or more contributor license agreements.  See the NOTICE file
 +# distributed with this work for additional information
@@ -593,37 +739,186 @@ index 0000000..7979e8f
 +# specific language governing permissions and limitations
 +# under the License.
 +# pylint: disable=import-outside-toplevel
-+"""Tests for SupersetResultSet.from_arrow (Arrow-native result sets)."""
++"""SupersetResultSet.from_arrow compared with the existing row constructor."""
 +
++import math
++from datetime import date, datetime, timedelta, timezone
 +from decimal import Decimal
 +from uuid import UUID
 +
 +import pyarrow as pa
++import pytest
++from pytest_mock import MockerFixture
 +
 +from superset.db_engine_specs.base import BaseEngineSpec
 +from superset.db_engine_specs.duckdb import DuckDBEngineSpec
++from superset.db_engine_specs.flightsql import FlightSQLEngineSpec
 +from superset.db_engine_specs.postgres import PostgresEngineSpec
 +from superset.result_set import SupersetResultSet
 +
++_BIG = 2**64 - 1
++
++
++def _same(left: list, right: list) -> None:
++    assert len(left) == len(right)
++    for got, expected in zip(left, right, strict=True):
++        if isinstance(got, float) and isinstance(expected, float):
++            if math.isnan(got) and math.isnan(expected):
++                continue
++        assert got == expected
++
++
++def _assert_matches_row(
++    type_code: str,
++    values: list,
++    arrow_column: pa.Array | list | None = None,
++    spec: type[BaseEngineSpec] = BaseEngineSpec,
++    *,
++    compare_generic: bool = True,
++) -> None:
++    """from_arrow output equals the row constructor for one column."""
++    column = values if arrow_column is None else arrow_column
++    row_rs = SupersetResultSet([(value,) for value in values], [("c", type_code)], spec)
++    arrow_rs = SupersetResultSet.from_arrow(pa.table({"c": column}), spec)
++    _same(
++        arrow_rs.pa_table.column("c").to_pylist(),
++        row_rs.pa_table.column("c").to_pylist(),
++    )
++    # Decimals are not named by convert_pa_dtype. Without driver metadata the
++    # row path also leaves the generic type empty when the cursor type does
++    # not map, so a cursor type string of "numeric" is not copied onto the
++    # Arrow side. Compare values only in that case.
++    if compare_generic:
++        assert arrow_rs.columns[0]["type_generic"] == row_rs.columns[0]["type_generic"]
++        assert bool(arrow_rs.columns[0]["is_dttm"]) == bool(row_rs.columns[0]["is_dttm"])
++
++
++def test_from_arrow_accepts_a_plain_table_without_adbc() -> None:
++    """The constructor takes a Table. No driver, no fetch."""
++    table = pa.table({"a": pa.array([1, None, 0])})
++    result = SupersetResultSet.from_arrow(table, BaseEngineSpec)
++    assert result.pa_table.column("a").to_pylist() == [1, None, 0]
++    assert BaseEngineSpec.supports_arrow_result is False
++
++
++def test_timestamps_match_row_path() -> None:
++    offset = timezone(timedelta(hours=5, minutes=45))
++    _assert_matches_row(
++        "timestamp",
++        [datetime(2024, 1, 2, 3, 4, 5), None],
++    )
++    _assert_matches_row(
++        "timestamptz",
++        [datetime(2023, 1, 1, tzinfo=timezone.utc), None],
++    )
++    _assert_matches_row(
++        "timestamptz",
++        [datetime(2024, 6, 1, 12, 30, tzinfo=offset), None],
++    )
++    _assert_matches_row(
++        "timestamp",
++        [datetime(9999, 12, 31, 23, 59, 59)],
++    )
++    _assert_matches_row(
++        "timestamptz",
++        [datetime(3118, 1, 1, tzinfo=timezone.utc)],
++    )
++
++
++def test_dates_bools_blobs_and_nulls_match_row_path() -> None:
++    _assert_matches_row("date", [date(2020, 1, 2), None])
++    _assert_matches_row("bool", [True, False, None])
++    _assert_matches_row("bytea", [b"abc", None, b""])
++    _assert_matches_row("int", [1, None, 0, -3])
++    # An untyped all-null array is Arrow's null type. The row path still has
++    # the cursor type. Pass an int64 array so both sides report a numeric type.
++    _assert_matches_row("int", [None, None], pa.array([None, None], type=pa.int64()))
++
++
++def test_finite_decimals_match_row_path() -> None:
++    _assert_matches_row(
++        "numeric",
++        [Decimal("1.50"), Decimal("-0.0001"), None],
++        compare_generic=False,
++    )
++    wide = Decimal("123456789012345678901234567890.123456789")
++    _assert_matches_row("numeric", [wide, None], compare_generic=False)
++
++
++def test_non_finite_floats_match_row_path() -> None:
++    _assert_matches_row(
++        "float8",
++        [float("nan"), float("inf"), float("-inf"), 1.5, 0.0, None],
++    )
++
++
++def test_uint64_above_int64_matches_row_stringification() -> None:
++    """BIGINT UNSIGNED above 2**63-1 is stringified on the row path."""
++    values = [1, _BIG, 0, None]
++    _assert_matches_row(
++        "int",
++        values,
++        pa.array(values, type=pa.uint64()),
++    )
++
++
++def test_uint64_that_fits_int64_keeps_values() -> None:
++    values = [1, 2, None]
++    arrow_rs = SupersetResultSet.from_arrow(
++        pa.table({"c": pa.array(values, type=pa.uint64())}),
++        BaseEngineSpec,
++    )
++    row_rs = SupersetResultSet([(value,) for value in values], [("c", "int")], BaseEngineSpec)
++    _same(
++        arrow_rs.pa_table.column("c").to_pylist(),
++        row_rs.pa_table.column("c").to_pylist(),
++    )
++    # Width stays uint64. The row path infers int64. Same known difference
++    # as an int32 column, and values are equal.
++    assert pa.types.is_uint64(arrow_rs.pa_table.schema.field("c").type)
++
++
++def test_integers_inside_int64_are_not_stringified() -> None:
++    """2**53+1 fits in int64. The row path does not stringify it."""
++    value = 2**53 + 1
++    _assert_matches_row("int", [value, -value, None])
++    result = SupersetResultSet.from_arrow(
++        pa.table({"c": pa.array([value, -value, None])}),
++        BaseEngineSpec,
++    )
++    assert pa.types.is_integer(result.pa_table.schema.field("c").type)
++
 +
 +def test_from_arrow_names_match_row_path() -> None:
-+    table = pa.table(
-+        [pa.array([1]), pa.array([2]), pa.array([3])], names=["a", "a", ""]
-+    )
++    table = pa.table([pa.array([1]), pa.array([2]), pa.array([3])], names=["a", "a", ""])
 +    arrow_rs = SupersetResultSet.from_arrow(table, BaseEngineSpec)
 +    row_rs = SupersetResultSet([(1, 2, 3)], [("a",), ("a",), ("",)], BaseEngineSpec)
 +    assert arrow_rs.pa_table.column_names == row_rs.pa_table.column_names
++
++
++def test_nested_list_and_struct_match_row_path() -> None:
++    table = pa.table({"l": pa.array([[1, 2], None]), "s": pa.array([{"a": 1}, None])})
++    arrow_rs = SupersetResultSet.from_arrow(table, BaseEngineSpec)
++    row_rs = SupersetResultSet(
++        [([1, 2], {"a": 1}), (None, None)],
++        [("l",), ("s",)],
++        BaseEngineSpec,
++    )
++    _same(arrow_rs.pa_table.column("l").to_pylist(), row_rs.pa_table.column("l").to_pylist())
++    _same(arrow_rs.pa_table.column("s").to_pylist(), row_rs.pa_table.column("s").to_pylist())
++    assert arrow_rs.nested_columns == row_rs.nested_columns
 +
 +
 +def test_from_arrow_decodes_dictionary() -> None:
 +    table = pa.table({"c": pa.array(["x", "y", "x"]).dictionary_encode()})
 +    result_set = SupersetResultSet.from_arrow(table, BaseEngineSpec)
 +    assert result_set.pa_table.schema.field("c").type == pa.string()
++    assert result_set.pa_table.column("c").to_pylist() == ["x", "y", "x"]
 +
 +
-+def test_from_arrow_postgres_opaque_numeric() -> None:
++def test_opaque_numeric_nulls_non_finite_and_keeps_decimal() -> None:
 +    opaque = pa.opaque(pa.string(), "numeric", "PostgreSQL")
-+    storage = pa.array(["1.5", "NaN", None, "-0.0001"])
++    storage = pa.array(["1.50", "NaN", None, "-0.0001", "Infinity"])
 +    table = pa.table({"n": pa.ExtensionArray.from_storage(opaque, storage)})
 +    result_set = SupersetResultSet.from_arrow(table, BaseEngineSpec)
 +    assert result_set.pa_table.column("n").to_pylist() == [
@@ -631,10 +926,11 @@ index 0000000..7979e8f
 +        None,
 +        None,
 +        Decimal("-0.0001"),
++        None,
 +    ]
 +
 +
-+def test_from_arrow_json_is_lazy() -> None:
++def test_json_extension_is_lazy() -> None:
 +    storage = pa.array(['{"a": 1}', None, "5"])
 +    table = pa.table({"j": pa.ExtensionArray.from_storage(pa.json_(), storage)})
 +    result_set = SupersetResultSet.from_arrow(table, BaseEngineSpec)
@@ -642,26 +938,69 @@ index 0000000..7979e8f
 +    assert result_set.to_pandas_df()["j"].tolist() == [{"a": 1}, None, 5]
 +
 +
-+def test_from_arrow_uuid_is_stringified() -> None:
++def test_uuid_extension_is_stringified() -> None:
 +    value = UUID("c4ca4238-a0b9-2382-0dcc-509a6f75849b")
 +    table = pa.table({"u": pa.array([value, None], type=pa.uuid())})
 +    result_set = SupersetResultSet.from_arrow(table, BaseEngineSpec)
 +    assert result_set.pa_table.column("u").to_pylist() == [str(value), None]
 +
 +
-+def test_postgres_arrow_field_type_matches_psycopg2_names() -> None:
-+    field = pa.field("x", pa.int64(), metadata={"POSTGRESQL:type": "int8"})
-+    assert PostgresEngineSpec.get_datatype_from_arrow_field(field) == (
-+        PostgresEngineSpec.get_datatype(20)
-+    )
++def test_duration_is_not_rewritten_like_the_postgres_interval_mutator() -> None:
++    """
++    Postgres turns timedelta intervals into milliseconds inside ``fetch_data``,
++    before the row constructor. ``from_arrow`` does not apply that mutator.
++    """
++    table = pa.table({"iv": pa.array([1_000_000], type=pa.duration("us"))})
++    arrow_rs = SupersetResultSet.from_arrow(table, BaseEngineSpec)
++    row_rs = SupersetResultSet([(1000.0,)], [("iv", "interval")], BaseEngineSpec)
++    assert pa.types.is_duration(arrow_rs.pa_table.schema.field("iv").type)
++    assert row_rs.pa_table.column("iv").to_pylist() == [1000.0]
++    assert arrow_rs.pa_table.column("iv").to_pylist() != row_rs.pa_table.column("iv").to_pylist()
 +
 +
-+def test_fetch_arrow_limit_and_opt_in() -> None:
++def test_empty_table_keeps_column_names() -> None:
++    table = pa.table({"a": pa.array([], type=pa.int64())})
++    result_set = SupersetResultSet.from_arrow(table, BaseEngineSpec)
++    assert result_set.size == 0
++    assert [column["column_name"] for column in result_set.columns] == ["a"]
++
++
++def test_engine_opt_in_is_per_spec_and_defaults_off() -> None:
++    assert BaseEngineSpec.supports_arrow_result is False
++    assert DuckDBEngineSpec.supports_arrow_result is True
++    assert PostgresEngineSpec.supports_arrow_result is True
++    assert FlightSQLEngineSpec.supports_arrow_result is True
++
++    class _Cursor:
++        description = [("a", "int")]
++
++        def fetch_record_batch(self) -> pa.Table:
++            return pa.table({"a": [1, 2, 3]})
++
++    assert BaseEngineSpec.fetch_arrow(_Cursor()) is None
++    assert DuckDBEngineSpec.fetch_arrow(_Cursor()).num_rows == 3  # type: ignore[union-attr]
++
++
++def test_fetch_arrow_accepts_table_without_record_batches() -> None:
++    """DuckDB-style cursor: a Table, no ADBC ``fetch_record_batch``."""
++
++    class _Cursor:
++        description = [("a", pa.int64())]
++
++        def to_arrow_table(self) -> pa.Table:
++            return pa.table({"a": pa.array([1, 2, 3, 4, 5])})
++
++    table = DuckDBEngineSpec.fetch_arrow(_Cursor(), limit=2)
++    assert table is not None
++    assert table.column("a").to_pylist() == [1, 2]
++
++
++def test_fetch_arrow_limit_on_record_batches() -> None:
 +    batches = [
 +        pa.record_batch({"a": pa.array(range(i * 10, i * 10 + 10))}) for i in range(5)
 +    ]
 +
-+    class Reader:
++    class _Reader:
 +        schema = batches[0].schema
 +
 +        def __iter__(self):  # type: ignore[no-untyped-def]
@@ -670,12 +1009,63 @@ index 0000000..7979e8f
 +        def read_all(self) -> pa.Table:
 +            return pa.Table.from_batches(batches)
 +
-+    class Cursor:
++    class _Cursor:
 +        description = [("a", pa.int64())]
 +
-+        def fetch_record_batch(self) -> Reader:
-+            return Reader()
++        def fetch_record_batch(self) -> _Reader:
++            return _Reader()
 +
-+    assert BaseEngineSpec.fetch_arrow(Cursor()) is None
-+    assert DuckDBEngineSpec.fetch_arrow(Cursor(), limit=25).num_rows == 25  # type: ignore[union-attr]
-+    assert DuckDBEngineSpec.fetch_arrow(Cursor()).num_rows == 50  # type: ignore[union-attr]
++    limited = DuckDBEngineSpec.fetch_arrow(_Cursor(), limit=25)
++    assert limited is not None and limited.num_rows == 25
++    entire = DuckDBEngineSpec.fetch_arrow(_Cursor())
++    assert entire is not None and entire.num_rows == 50
++
++
++def test_fetch_arrow_none_for_row_cursor() -> None:
++    class _RowCursor:
++        description = [("a", 23)]
++
++    assert PostgresEngineSpec.fetch_arrow(_RowCursor()) is None
++
++
++def test_postgres_arrow_field_type_matches_psycopg2_names() -> None:
++    field = pa.field("x", pa.int64(), metadata={b"POSTGRESQL:type": b"int8"})
++    assert PostgresEngineSpec.get_datatype_from_arrow_field(field) == (
++        PostgresEngineSpec.get_datatype(20)
++    )
++
++
++def test_maybe_fetch_arrow_requires_the_feature_flag(mocker: MockerFixture) -> None:
++    class _Cursor:
++        description = [("a", "int")]
++        consumed = False
++
++        def fetch_record_batch(self) -> pa.Table:
++            self.consumed = True
++            return pa.table({"a": [1]})
++
++    cursor = _Cursor()
++    mocker.patch("superset.is_feature_enabled", return_value=False)
++    assert DuckDBEngineSpec.maybe_fetch_arrow(cursor) is None
++    assert cursor.consumed is False
++
++    mocker.patch("superset.is_feature_enabled", return_value=True)
++    table = DuckDBEngineSpec.maybe_fetch_arrow(cursor)
++    assert table is not None and table.num_rows == 1
++    assert cursor.consumed is True
++
++
++@pytest.mark.parametrize(
++    "spec",
++    [BaseEngineSpec, DuckDBEngineSpec, PostgresEngineSpec],
++)
++def test_row_constructor_still_builds_without_arrow(
++    spec: type[BaseEngineSpec],
++) -> None:
++    result = SupersetResultSet(
++        [(1, datetime(2024, 1, 1))],
++        [("n", "int"), ("ts", "timestamp")],
++        spec,
++    )
++    assert result.size == 1
++    assert result.pa_table.column("n").to_pylist() == [1]

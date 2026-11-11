@@ -1,17 +1,41 @@
 # Type parity: current row path vs Arrow path
 
-Source of truth: `results/type-parity.json` (written by `just parity`) and the pinned
-signature in `tests/golden/known_divergences.json` (checked by `just test`). Everything
-below was observed in those files. "rows" is the driver Superset uses today (psycopg2,
-duckdb-engine, flightsql-dbapi), "adbc_rows" is an ADBC cursor fed through today's
-`fetchall()` + `SupersetResultSet(...)` (what a `sqlalchemy-adbc` user gets on master),
-"arrow" is ADBC `fetch_record_batch()` + the prototype `SupersetResultSet.from_arrow(...)`.
+Two checks. Neither invents a new result contract; both compare `from_arrow` to the
+row constructor that Superset already ships.
 
-Compared per column: `pa_table` Arrow type, `.columns` (`type`, `type_generic`, `is_dttm`,
-what SQL Lab and Explore use), the records of Superset's sync path (Superset's own
-`to_pandas_df()` + `df_to_records(..., convert_decimals=True)`, as in
-`sql_lab._serialize_and_expand_data`), `nested_columns`, and the values in `pa_table` (what
-the msgpack/IPC results-backend path ships). The harness itself does not use pandas.
+**Constructor tests** (`tests/test_from_arrow_unit.py`, no database) build the Python
+values the row constructor receives and a `pyarrow.Table` of the same values. They
+cover timestamps (naive, UTC, a +05:45 offset, far-future), finite decimals, integers
+above 2**63−1, nulls, non-finite floats, dates, nested list/struct values, and column
+names. `type_generic` and `is_dttm` are compared for timestamps, floats,
+integers, booleans, and dates. Decimal checks compare values: without driver
+metadata, `convert_pa_dtype` does not name decimals, and `from_arrow` does not
+invent a generic type the row path does not report. Postgres `POSTGRESQL:type`
+metadata is what makes the type string match psycopg2.
+
+Two differences are intentional and pinned in those tests:
+
+* A non-finite `Decimal` makes the row constructor stringify the whole column, because
+  `pa.array` rejects it. `from_arrow` nulls only the non-finite cells and keeps finite
+  values as decimals (the same per-cell rule `stringify_values` states: NaN and
+  Infinity have no exact value).
+* Postgres intervals are converted to milliseconds inside `fetch_data`, before the
+  row constructor. `from_arrow` does not apply that mutator. A duration column stays
+  a duration. This is still an open gap.
+
+**Live comparison** below is the 2026-11-10 run. Source of truth:
+`results/type-parity.json` (written by `just parity`) and the pinned signature in
+`tests/golden/known_divergences.json` (checked by `just test` when the services are
+up). This branch retargets the patch and does not re-run that harness. "rows" is the
+driver Superset uses today (psycopg2, duckdb-engine, flightsql-dbapi), "adbc_rows" is
+an ADBC cursor fed through `fetchall()` + `SupersetResultSet(...)` (diagnostic, not a
+proposed feature), "arrow" is an ADBC Arrow fetch + `SupersetResultSet.from_arrow(...)`.
+`from_arrow` itself accepts a Table from any source; ADBC is the source that run used.
+
+Compared per column: `pa_table` Arrow type, `.columns` (`type`, `type_generic`, `is_dttm`),
+the records of Superset's synchronous chart-data conversion (`to_pandas_df()` +
+`df_to_records(..., convert_decimals=True)`), `nested_columns`, and the values in
+`pa_table` (what the msgpack/IPC results-backend path ships).
 
 ## Benchmark table (1,000 rows; int, float, decimal, text, timestamptz, timestamp, date, bool, json, uuid, nulls)
 
@@ -24,7 +48,7 @@ match on Postgres and DuckDB; on Flight SQL they match between adbc_rows and arr
 | all | `i32` (INTEGER) | Arrow `int64` | Arrow `int32` | Row path re-infers Python ints as int64; Arrow keeps the server width. Values equal. Deliberately not widened. |
 | all | `dec` (DECIMAL(18,4)) | `decimal128(7, 4)` (inferred from values) | Postgres `decimal128(38, 4)`, DuckDB/Flight SQL `decimal128(18, 4)` | Precision metadata only; `Decimal` values equal. |
 | postgres | `js` (json) | IPC payload: `json.dumps` of psycopg2's dict -> `{"k": 1, "tag": "x1"}` | IPC payload: server text `{"k" : 1, "tag" : "x1"}` | Whitespace in the IPC/msgpack payload only; sync-path records and `nested_columns` are equal (parsed lazily). |
-| flightsql | `d` (DATE) | flightsql-dbapi returns `pandas.Timestamp` -> Arrow `timestamp[us]` | `date32` -> `datetime.date` | A flightsql-dbapi conversion, not the result set: the ADBC row path already gets `date`. |
+| flightsql | `d` (DATE) | flightsql-dbapi returns a Timestamp -> Arrow `timestamp[us]` | `date32` -> `datetime.date` | A flightsql-dbapi conversion, not the result set: the ADBC row path already gets `date`. |
 
 ## Edge cases (one row each, see `EDGE_COLUMNS` in `bench/parity.py`)
 
@@ -32,7 +56,7 @@ match on Postgres and DuckDB; on Flight SQL they match between adbc_rows and arr
 |---|---|---|---|---|
 | postgres | `'NaN'::numeric` | NULL (Arrow `null`) | NULL (Arrow `string`, all-null) | `from_arrow` maps NaN/Infinity to NULL like `stringify_values`; an all-NULL column keeps the storage type. |
 | postgres | 39-digit numeric | `decimal256(39, 9)` | `decimal256(76, 9)` | Exact value preserved on both. |
-| postgres, duckdb | `interval` | Postgres: float milliseconds, 93784000.0 (`column_type_mutators`); DuckDB: `duration[us]` (a pandas `Timedelta` after Superset's `to_pandas_df()`) | `month_day_nano_interval`; Superset's `to_pandas_df()` turns it into a pandas `DateOffset` object | **Open.** Needs an engine-spec hook (Postgres) or a cast when months == 0. Not handled by the prototype. |
+| postgres, duckdb | `interval` | Postgres: float milliseconds, 93784000.0 (`column_type_mutators`, applied in `fetch_data` before the row constructor); DuckDB: `duration[us]` | `month_day_nano_interval` | **Open.** `from_arrow` does not apply the Postgres mutator. Needs an engine-spec hook, or a cast when months == 0. |
 | postgres | `'5'::json` (scalar) | psycopg2 parses -> `int64` column | JSON text `"5"` (string), not nested | Row path type depends on the JSON content; Arrow keeps the declared type. |
 | postgres, duckdb | `NULL::text` / `NULL::VARCHAR` | Arrow `null` | Arrow `string` | DuckDB rows reports type `None`, arrow `STRING`. |
 | flightsql | `[1, 2, NULL]` | flightsql-dbapi returns `numpy.ndarray` in `nested_columns` / sync records | Python `list` | an ndarray cell breaks `v == v`-style checks (it broke this harness once). |
