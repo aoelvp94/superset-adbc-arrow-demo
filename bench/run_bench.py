@@ -60,13 +60,21 @@ def versions() -> dict:
         with open("/proc/cpuinfo") as fh:
             out["cpu"] = next(l.split(":", 1)[1].strip() for l in fh if l.startswith("model name"))
     except (OSError, StopIteration):
-        out["cpu"] = None
+        try:
+            out["cpu"] = subprocess.run(
+                ["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True, timeout=5,
+            ).stdout.strip() or None
+        except OSError:
+            out["cpu"] = None
     out["cpu_count"] = os.cpu_count()
+    out["platform"] = sys.platform
     try:
         with open("/proc/meminfo") as fh:
             out["mem_total_gb"] = round(int(fh.readline().split()[1]) / 2**20, 1)
     except OSError:
-        pass
+        import psutil
+
+        out["mem_total_gb"] = round(psutil.virtual_memory().total / 2**30, 1)
     try:
         out["docker_images"] = subprocess.run(
             ["docker", "inspect", "--format", "{{.Name}} {{.Config.Image}} {{.Image}}",

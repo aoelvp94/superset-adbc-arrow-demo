@@ -39,6 +39,11 @@ def render(snap: dict, title: str = "# Benchmark results") -> str:
     if res and res[0].get("downstream") == "ipc":
         lines += ["Downstream: **IPC only** (`--downstream ipc`): Superset's `to_pandas_df()` is not run, "
                   "so `pandas` / `total (pandas)` are `-`.", ""]
+    if env.get("platform", "linux").startswith("linux"):
+        rss_note = "just before the query (VmHWM reset)."
+    else:
+        rss_note = ("just before the query. On this platform the high-water mark cannot be reset, "
+                    "so it also covers imports and setup in the worker process; compare it across paths only.")
     lines += [
         f"Snapshot: `{snap.get('_file', '')}` (started {snap['started_utc']}, finished {snap['finished_utc']}).",
         "All numbers below are copied from that JSON by `bench/render.py`; medians over the rounds shown.",
@@ -46,7 +51,7 @@ def render(snap: dict, title: str = "# Benchmark results") -> str:
         "Times in seconds (wall clock). `total (IPC)` = fetch + result set + `write_ipc_buffer` "
         "(SQL Lab with `RESULTS_BACKEND_USE_MSGPACK=True`, the default). `total (pandas)` = fetch + "
         "result set + `to_pandas_df()`. Peak RSS is the resident-memory high-water mark above the RSS "
-        "just before the query (VmHWM reset). tracemalloc peak counts Python-heap allocations only "
+        f"{rss_note} tracemalloc peak counts Python-heap allocations only "
         "(Arrow/ADBC C buffers are not traced) and comes from a separate run.",
         "",
     ]

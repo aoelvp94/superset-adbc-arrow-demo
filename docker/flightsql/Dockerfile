@@ -4,8 +4,11 @@
 # fetch the signed extension over https at build time.
 FROM gizmodata/gizmosql@sha256:4f719de2c2cef4bd80052d54020141e523bd74999a615cdfdf1624f2374d5ccf
 ARG DUCKDB_VERSION=v1.5.6
-RUN python3 -c "import gzip,urllib.request,os; \
-u='https://extensions.duckdb.org/${DUCKDB_VERSION}/linux_amd64/json.duckdb_extension.gz'; \
-d=os.path.expanduser('~/.duckdb/extensions/${DUCKDB_VERSION}/linux_amd64/json.duckdb_extension'); \
+# The image is multi-arch, so take the platform from DuckDB itself.
+RUN python3 -c "import duckdb,gzip,urllib.request,os; \
+p=duckdb.execute('PRAGMA platform').fetchone()[0]; \
+u=f'https://extensions.duckdb.org/${DUCKDB_VERSION}/{p}/json.duckdb_extension.gz'; \
+d=os.path.expanduser(f'~/.duckdb/extensions/${DUCKDB_VERSION}/{p}'); \
+os.makedirs(d, exist_ok=True); \
 r=urllib.request.Request(u, headers={'User-Agent': 'DuckDB'}); \
-open(d,'wb').write(gzip.decompress(urllib.request.urlopen(r).read()))"
+open(os.path.join(d, 'json.duckdb_extension'),'wb').write(gzip.decompress(urllib.request.urlopen(r).read()))"

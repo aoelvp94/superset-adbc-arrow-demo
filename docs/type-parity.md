@@ -24,13 +24,12 @@ Two differences are intentional and pinned in those tests:
   day counts (a year is 365 days, a month is 30) before `_normalize_interval`.
   A `duration` column is already a timedelta and goes through that function.
   `1 day 02:03:04` is 93784000.0 on both paths. `BaseEngineSpec` and DuckDB do
-  not rewrite intervals. The 2026-11-10 live run below still records the old
-  divergence; that harness was not re-run.
+  not rewrite intervals. The live run below confirms it against Postgres.
 
-**Live comparison** below is the 2026-11-10 run. Source of truth:
+**Live comparison** below is the 2026-11-14 run on `f81191d`. Source of truth:
 `results/type-parity.json` (written by `just parity`) and the pinned signature in
 `tests/golden/known_divergences.json` (checked by `just test` when the services are
-up). This branch retargets the patch and does not re-run that harness. "rows" is the
+up). "rows" is the
 driver Superset uses today (psycopg2, duckdb-engine, flightsql-dbapi), "adbc_rows" is
 an ADBC cursor fed through `fetchall()` + `SupersetResultSet(...)` (diagnostic, not a
 proposed feature), "arrow" is an ADBC Arrow fetch + `SupersetResultSet.from_arrow(...)`.
@@ -60,7 +59,7 @@ match on Postgres and DuckDB; on Flight SQL they match between adbc_rows and arr
 |---|---|---|---|---|
 | postgres | `'NaN'::numeric` | NULL (Arrow `null`) | NULL (Arrow `string`, all-null) | `from_arrow` maps NaN/Infinity to NULL like `stringify_values`; an all-NULL column keeps the storage type. |
 | postgres | 39-digit numeric | `decimal256(39, 9)` | `decimal256(76, 9)` | Exact value preserved on both. |
-| postgres, duckdb | `interval` | Postgres: float milliseconds, 93784000.0 (`column_type_mutators`, applied in `fetch_data` before the row constructor); DuckDB: `duration[us]` | `month_day_nano_interval` in this 2026-11-10 run | **Postgres constructor gap closed since this run.** `PostgresEngineSpec.normalize_arrow_column` now emits the same milliseconds. DuckDB is unchanged. Re-run `just parity` before treating this row as current. |
+| duckdb | `interval` | `duration[us]` | `month_day_nano_interval` | DuckDB intervals are not rewritten on either side. Postgres now matches live: float milliseconds (93784000.0), `INTERVAL`, `NUMERIC`, on both paths. Today's ADBC row path (`adbc_rows`) gets a pandas `DateOffset` instead, which the patch fixes. |
 | postgres | `'5'::json` (scalar) | psycopg2 parses -> `int64` column | JSON text `"5"` (string), not nested | Row path type depends on the JSON content; Arrow keeps the declared type. |
 | postgres, duckdb | `NULL::text` / `NULL::VARCHAR` | Arrow `null` | Arrow `string` | DuckDB rows reports type `None`, arrow `STRING`. |
 | flightsql | `[1, 2, NULL]` | flightsql-dbapi returns `numpy.ndarray` in `nested_columns` / sync records | Python `list` | an ndarray cell breaks `v == v`-style checks (it broke this harness once). |

@@ -67,16 +67,14 @@ classic row driver. It is not a proposed feature.
 
 ## What the snapshot measured
 
-The numbers below are the 2026-11-10 run against apache/superset
-`a131fcb623d88ed9eb7e7a414e226437423d645c` plus the patch as it was that day.
-This branch retargets the patch onto master
-`14365bbebd3ecfb3d9a0c1304908248d5fbeb3d4` (2026-11-11). The files the patch
-touches did not change between the previous pin `7d715a8` and this one; the
-patch was re-applied and the pin moved. It does not replace
-those snapshots. No 1M re-bench was run. The Arrow path in that run was an ADBC
-`fetch_record_batch` into `from_arrow`. ADBC cursors still take that method;
-the constructor now also accepts DuckDB's `to_arrow_reader` / `to_arrow_table`
-and a full `fetch_arrow_table`.
+The numbers below are the 2026-11-14 run against apache/superset master
+`f81191d55eef3e0fa3ae04b1c83d4e474a2a392a` plus the patch in this tree, the
+same patch that #5–#7 built, applied cleanly. The previous snapshot (2026-11-10,
+pin `a131fcb`, different machine) is kept in
+[`results/archive/2026-11-10-a131fcb/`](results/archive/2026-11-10-a131fcb/)
+for comparison; it is not what the tables below report. The Arrow path is an
+ADBC `fetch_record_batch` into `from_arrow`. The constructor also accepts
+DuckDB's `to_arrow_reader` / `to_arrow_table` and a full `fetch_arrow_table`.
 
 Three fetch paths, same SQL, same tables:
 
@@ -100,12 +98,14 @@ then `--rounds` timed runs (interleaved across paths). Tables report the
 **median**. A separate process enables tracemalloc; those timings are
 discarded, only the Python-heap peak is kept (Arrow/ADBC C buffers are not
 traced). Peak RSS is the resident-memory high-water mark above the RSS just
-before the query (`VmHWM` reset on Linux).
+before the query. On Linux the mark is reset first (`VmHWM`). On macOS it
+cannot be reset, so it also covers imports in the worker process; compare it
+across paths only.
 
-The JSON snapshots also record Superset's synchronous chart-data conversion
-after the result set. This patch does not change that step, and those fields
-were not re-measured. `results/BENCH.md` is the mechanical render of the same
-run and was not regenerated.
+`total (pandas)` = fetch + result set + Superset's own `to_pandas_df()`, the
+DataFrame that `Database.get_df` hands to chart code. The patch does not change
+that conversion; it is measured so the chart-path gain is not overstated.
+`results/BENCH.md` is the mechanical render of the same JSON.
 
 The dataset is one table per size: 11 columns (`id`, `i32`, `f64`, `dec`,
 `txt`, `ts_tz`, `ts`, `d`, `b`, `js`, `u`) with periodic NULLs, generated
@@ -116,14 +116,14 @@ deterministically in each engine.
 | Path | Purpose |
 |---|---|
 | `patches/0001-arrow-native-result-set.patch` | Ingest patch against the commit in `SUPERSET_COMMIT`. See `patches/README.md`. |
-| `SUPERSET_COMMIT` | `14365bbebd3ecfb3d9a0c1304908248d5fbeb3d4` (apache/superset master on 2026-11-11). |
+| `SUPERSET_COMMIT` | `f81191d55eef3e0fa3ae04b1c83d4e474a2a392a` (apache/superset master on 2026-11-14). |
 | `bench/run_bench.py`, `bench/run_one.py` | Fresh-process harness and one-shot worker. |
 | `bench/setup_data.py`, `bench/common.py` | Table generation and connection factories. |
 | `bench/parity.py`, `tests/` | Live type-parity comparison and constructor tests. |
 | `bench/render.py` | Renders `results/BENCH.md` from the JSON snapshots (numbers only from JSON). |
 | `docker-compose.yml`, `docker/flightsql/` | Postgres 17.6 and GizmoSQL 1.42.2. |
 | `justfile` | Setup, tests, bench, and render entry points. |
-| `results/` | Committed snapshots from the 2026-11-10 run, plus `pip-freeze.txt`. |
+| `results/` | Committed snapshots from the 2026-11-14 run, plus `pip-freeze.txt`. Older runs are in `results/archive/`. |
 | `docs/type-parity.md` | Observed type differences between the row and Arrow paths. |
 | `evidence/task-a/` | Does `apache-superset[datafusion]` resolve? (It does not, today.) |
 
@@ -138,61 +138,37 @@ first, e.g. `export DOCKER_HOST=tcp://127.0.0.1:2375`.
 ```bash
 just up                 # Postgres + GizmoSQL
 just venv               # clone pinned Superset, apply the patch, install into .venv
-just setup-data         # 1k / 100k / 1M / 10M tables in each backend
+just setup-data         # 1k / 10k / 50k / 100k / 1M / 10M tables in each backend
 just test               # constructor tests; golden type-parity needs the services
 just parity             # writes results/type-parity.json
 ```
 
-The commands that produced the committed snapshots (2026-11-10), against the
-older pin, are unchanged. They were not re-run on `14365bb`:
+The committed snapshots (2026-11-14) came from:
 
 ```bash
-# 100k × 5 rounds and 1M × 3 rounds; all backends × all paths.
-# Time + memory. The synchronous chart-data stage is in the JSON.
-.venv/bin/python bench/run_bench.py \
-    --rows 100000 1000000 --rounds 5 3 \
-    --max-rss-gb 5 --downstream both \
-    --out results/bench-main.json
-
-# Arrow path only, IPC downstream only: 1M and a 10M attempt.
-# 10M was skipped by the memory guard (see Results).
-.venv/bin/python bench/run_bench.py \
-    --rows 1000000 10000000 --rounds 3 3 \
-    --paths arrow --downstream ipc --max-rss-gb 5 \
-    --out results/bench-large-ipc.json
-
-# Arrow path only, IPC downstream only, 3M rows (fits under the 5 GiB guard).
-.venv/bin/python bench/run_bench.py \
-    --rows 3000000 --rounds 3 \
-    --paths arrow --downstream ipc --max-rss-gb 5 \
-    --out results/bench-large-ipc-3m.json
-
-.venv/bin/python bench/render.py \
-    results/bench-main.json \
-    results/bench-large-ipc.json \
-    results/bench-large-ipc-3m.json \
+just bench          # 10k/50k/100k × 5 rounds, 1M × 3; all backends × all paths
+just bench-large    # Arrow only, IPC only: 1M and a 10M attempt (skipped by the guard)
+mv results/bench-latest.json results/bench-main.json
+mv results/bench-large-latest.json results/bench-large-ipc.json
+.venv/bin/python bench/render.py results/bench-main.json results/bench-large-ipc.json \
     --out results/BENCH.md
 ```
-
-`just bench` and `just bench-large` run the same harness with default output
-names (`results/bench-latest.json`, `results/bench-large-latest.json`).
 `just bench-quick` is a short sanity run (100k rows, 2 rounds).
 `just reproduce` runs services, venv, data, tests, parity, both benches, and render.
 
 ## Environment
 
-Measured on 2026-11-10 (Asia/Yerevan) on an 8-vCPU `Intel(R) Xeon(R) Processor`
-box with 15.6 GiB RAM, Linux 6.12, Python 3.11.17. Other workloads were
-running on the same machine, so **absolute times are noisy**; the useful
-signal is the comparison across paths in the same run. Versions pinned in
-`requirements.txt` and recorded in each JSON snapshot. The Superset commit in
-the snapshot is the old pin; the patch in this branch applies to the commit in
-`SUPERSET_COMMIT`.
+Measured on 2026-11-14 on an Apple M4 (10 cores, 24 GiB RAM), macOS 26.5.2,
+Python 3.11.14, with Postgres and GizmoSQL in Docker Desktop (arm64 images).
+No other benchmark or test ran during the measurement. Absolute times are not
+comparable with the 2026-11-10 snapshot, which ran on a shared 8-vCPU Linux
+Xeon; compare paths inside one snapshot. Versions are pinned in
+`requirements.txt` and recorded in each JSON snapshot.
 
 | Component | Version |
 |---|---|
-| apache/superset (snapshot) | `a131fcb623d88ed9eb7e7a414e226437423d645c` + the patch as of that run |
-| apache/superset (this branch) | `14365bbebd3ecfb3d9a0c1304908248d5fbeb3d4` + `patches/0001-arrow-native-result-set.patch` |
+| apache/superset | `f81191d55eef3e0fa3ae04b1c83d4e474a2a392a` + `patches/0001-arrow-native-result-set.patch` |
+| pandas / numpy | 3.1.1 / 2.4.6 (Superset's own requirements) |
 | pyarrow | 26.0.1 |
 | SQLAlchemy | 2.0.57 |
 | duckdb / duckdb-engine | 1.5.6 / 0.17.0 |
@@ -203,101 +179,94 @@ the snapshot is the old pin; the patch in this branch applies to the commit in
 | Flight SQL image | GizmoSQL 1.42.2 (`sab-flightsql:gizmosql-1.42.2-json`) |
 
 The full `pip freeze` from that run is in [`results/pip-freeze.txt`](results/pip-freeze.txt).
-It was not refreshed, because the venv was not reinstalled for a new measurement.
 
 ## Results
 
-All numbers below are medians copied from the JSON snapshots. They were not
-recomputed on the retargeted patch. The mechanical render is
-[`results/BENCH.md`](results/BENCH.md).
+All numbers below are medians copied from the JSON snapshots. The mechanical
+render is [`results/BENCH.md`](results/BENCH.md).
 
-### 1,000,000 rows, all paths, IPC
+### Speedup across sizes
 
-Source: [`results/bench-main.json`](results/bench-main.json), 3 rounds, started
-11:34 and finished 12:06 (Asia/Yerevan). `total (IPC)` is the headline
-comparison (async SQL Lab default).
+Source: [`results/bench-main.json`](results/bench-main.json) (2026-11-14,
+15:04–15:42 UTC). 5 rounds at 10k, 50k and 100k rows; 3 rounds at 1M.
+`rows` is the driver Superset uses today; `arrow` is `from_arrow`.
 
-| backend | path | fetch (s) | result set (s) | IPC (s) | **total IPC (s)** | speedup vs rows (IPC) | peak RSS (MiB) | tracemalloc (MiB) |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| postgres | rows | 8.30 | 11.38 | 0.22 | **19.90** | 1.0× | 1884 | 1197 |
-| postgres | adbc_rows | 21.78 | 4.50 | 0.23 | **26.51** | 0.8× | 1082 | 870 |
-| postgres | arrow | 1.07 | 0.35 | 0.27 | **1.73** | 11.5× | 1010 | 470 |
-| duckdb | rows | 7.28 | 5.25 | 0.21 | **12.77** | 1.0× | 1328 | 897 |
-| duckdb | adbc_rows | 14.57 | 2.51 | 0.20 | **17.28** | 0.7× | 1203 | 763 |
-| duckdb | arrow | 0.22 | &lt;0.001 | 0.17 | **0.40** | 32.0× | 894 | 124 |
-| flightsql | rows | 5.97 | 15.26 | 0.20 | **21.46** | 1.0× | 1618 | 1238 |
-| flightsql | adbc_rows | 15.30 | 3.16 | 0.20 | **18.64** | 1.2× | 1024 | 763 |
-| flightsql | arrow | 0.24 | &lt;0.001 | 0.24 | **0.48** | 44.7× | 697 | 124 |
+| rows | backend | rows: total IPC (s) | arrow: total IPC (s) | speedup (IPC) | speedup (pandas) |
+|---:|---|---:|---:|---:|---:|
+| 10,000 | postgres | 0.130 | 0.026 | 5.0× | 3.8× |
+| 10,000 | duckdb | 0.077 | 0.005 | 16.7× | 10.8× |
+| 10,000 | flightsql | 0.183 | 0.038 | 4.7× | 4.2× |
+| 50,000 | postgres | 0.552 | 0.102 | 5.4× | 3.6× |
+| 50,000 | duckdb | 0.364 | 0.012 | 30.9× | 18.4× |
+| 50,000 | flightsql | 0.653 | 0.087 | 7.5× | 7.0× |
+| 100,000 | postgres | 1.101 | 0.175 | 6.3× | 4.3× |
+| 100,000 | duckdb | 0.657 | 0.020 | 32.7× | 20.8× |
+| 100,000 | flightsql | 1.268 | 0.114 | 11.1× | 10.4× |
+| 1,000,000 | postgres | 13.36 | 1.25 | 10.7× | 6.6× |
+| 1,000,000 | duckdb | 5.83 | 0.22 | 26.8× | 22.2× |
+| 1,000,000 | flightsql | 11.09 | 0.59 | 18.7× | 18.0× |
 
-Arrow is 11.5× / 32.0× / 44.7× faster than the current row path on
-Postgres / DuckDB / Flight SQL at this size, measured at `total (IPC)` on that
-run. Most of the gain is in fetch (record batches instead of `fetchall()`) and
-in result-set construction (`from_arrow` instead of building the result set
-from Python rows). `adbc_rows` is usually slower than `rows`: the ADBC driver
-still has to convert Arrow to Python rows for today's constructor.
+`speedup (pandas)` uses `total (pandas)`: what the chart path pays before chart
+code runs. It is lower than the IPC speedup because `to_pandas_df()` is the same
+work on both paths and becomes a larger share once ingest is cheap (Postgres at
+1M: 0.89 s of the Arrow path's 2.02 s).
 
-The same run at 100,000 rows (5 rounds) is in the JSON and in
-`results/BENCH.md`. Directionally the same: Postgres 1.93 s vs 0.18 s,
-DuckDB 1.32 s vs 0.058 s, Flight SQL 2.24 s vs 0.068 s (`total IPC`, rows vs
-arrow).
+### 1,000,000 rows, all paths
 
-### Arrow only, IPC only: 1M and 3M
+| backend | path | fetch (s) | result set (s) | IPC (s) | **total IPC (s)** | speedup vs rows (IPC) | total pandas (s) | peak RSS (MiB) | tracemalloc (MiB) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| postgres | rows | 4.43 | 8.87 | 0.11 | **13.36** | 1.0× | 13.38 | 1602 | 1197 |
+| postgres | adbc_rows | 12.44 | 2.45 | 0.04 | **14.78** | 0.9× | 14.77 | 959 | 870 |
+| postgres | arrow | 0.95 | 0.15 | 0.10 | **1.25** | 10.7× | 2.02 | 837 | 470 |
+| duckdb | rows | 3.12 | 2.67 | 0.04 | **5.83** | 1.0× | 5.90 | 1148 | 897 |
+| duckdb | adbc_rows | 9.47 | 1.61 | 0.03 | **11.15** | 0.5× | 11.23 | 861 | 763 |
+| duckdb | arrow | 0.12 | &lt;0.01 | 0.09 | **0.22** | 26.8× | 0.27 | 793 | 124 |
+| flightsql | rows | 3.17 | 7.86 | 0.04 | **11.09** | 1.0× | 11.15 | 1438 | 1238 |
+| flightsql | adbc_rows | 7.80 | 1.75 | 0.03 | **9.60** | 1.2× | 9.67 | 893 | 763 |
+| flightsql | arrow | 0.50 | &lt;0.01 | 0.10 | **0.59** | 18.7× | 0.62 | 698 | 124 |
 
-`--downstream ipc` stops after `write_ipc_buffer`. That is the async SQL Lab
-question, and it is how the Arrow path fits in memory at a few million rows.
+Most of the gain is in fetch (record batches instead of `fetchall()`) and in
+result-set construction (`from_arrow` instead of building the result set from
+Python rows). `adbc_rows` is usually slower than `rows`: the ADBC driver still
+has to convert Arrow to Python rows for today's constructor.
 
-1,000,000 rows, 3 rounds, [`results/bench-large-ipc.json`](results/bench-large-ipc.json)
-(12:06–12:07 Asia/Yerevan):
+### Arrow only, IPC only: 1M
+
+[`results/bench-large-ipc.json`](results/bench-large-ipc.json), 3 rounds
+(15:42–15:44 UTC). `--downstream ipc` stops after `write_ipc_buffer`.
 
 | backend | **total IPC (s)** | fetch (s) | result set (s) | IPC (s) | peak RSS (MiB) |
 |---|---:|---:|---:|---:|---:|
-| postgres | **1.76** | 1.17 | 0.34 | 0.26 | 607 |
-| duckdb | **0.47** | 0.29 | &lt;0.001 | 0.17 | 743 |
-| flightsql | **0.50** | 0.26 | &lt;0.001 | 0.24 | 546 |
+| postgres | **1.28** | 1.03 | 0.19 | 0.14 | 590 |
+| duckdb | **0.24** | 0.14 | &lt;0.01 | 0.10 | 730 |
+| flightsql | **1.06** | 0.95 | &lt;0.01 | 0.13 | 544 |
 
-3,000,000 rows, 3 rounds, [`results/bench-large-ipc-3m.json`](results/bench-large-ipc-3m.json)
-(12:10–12:12 Asia/Yerevan). This run finished; it was not retried.
-
-| backend | **total IPC (s)** | fetch (s) | result set (s) | IPC (s) | peak RSS (MiB) | IPC payload (MiB) |
-|---|---:|---:|---:|---:|---:|---:|
-| postgres | **4.85** | 3.33 | 1.10 | 0.53 | 1219 | 408 |
-| duckdb | **1.38** | 0.79 | &lt;0.001 | 0.51 | 1906 | 390 |
-| flightsql | **1.12** | 0.63 | &lt;0.001 | 0.52 | 1347 | 390 |
-
-The 1M IPC-only totals agree with the all-path run to within ordinary
-run-to-run noise (1.76 vs 1.73, 0.47 vs 0.40, 0.50 vs 0.48). Peak RSS is
-lower here because the synchronous chart-data conversion is not run
-(Postgres 607 MiB vs 1010 MiB at 1M).
+Postgres and DuckDB agree with the all-path run (1.28 vs 1.25, 0.24 vs 0.22).
+Flight SQL fetch varied between the two runs (0.95 s vs 0.50 s), so treat its
+1M Arrow figure as 0.6–1.1 s; it is 10–19× the row path either way.
 
 ### 10M rows: skipped
 
-The 10M Arrow / IPC attempt in `bench-large-ipc.json` was **not run**. The
-harness extrapolates peak RSS linearly from the previous size and skipped
-every backend against `--max-rss-gb 5`:
-
-- postgres: estimated 5.9 GiB
-- duckdb: estimated 7.3 GiB
-- flightsql: estimated 5.3 GiB
-
-The 3M peaks (1.2–1.9 GiB) are consistent with that extrapolation. A machine
-with more headroom could rerun with a higher `--max-rss-gb`.
+The 10M attempt was **not run**. The harness extrapolates peak RSS from the
+previous size and skipped every backend against `--max-rss-gb 5`: postgres
+5.8 GiB, duckdb 7.1 GiB, flightsql 5.3 GiB (estimates). On macOS the peak
+includes worker start-up, so these estimates are conservative.
 
 ## Caveats
 
 - **This is a personal prototype, not a Superset PR.** The patch applies to
   the commit in `SUPERSET_COMMIT` and is documented in `patches/README.md`.
   Behaviour can still move if this is proposed upstream later.
-- **The snapshot figures are from 2026-11-10**, on the previous pin. They are
-  not a measurement of `14365bb` (or of `7d715a8`). If a number from that run no longer describes
-  the retargeted code, this README says so instead of guessing. The ADBC
-  `fetch_record_batch` → `from_arrow` → IPC sequence that produced `total (IPC)`
-  is still the harness's Arrow path.
+- **The figures are from 2026-11-14 on `f81191d`**, on one Apple M4 laptop.
+  The 2026-11-10 snapshot on `a131fcb` (Linux Xeon) is archived; its 1M
+  speedups were larger (11.5× / 32× / 44.7×). On this machine the row baseline
+  is 1.5–2.2× faster (13.4 / 5.8 / 11.1 s vs 19.9 / 12.8 / 21.5 s), while the
+  Arrow path moved less (1.25 / 0.22 / 0.59 s vs 1.73 / 0.40 / 0.48 s).
 - **`adbc_rows` is not a proposed feature.** It separates "use an ADBC driver"
   from "use `from_arrow`". It is often slower than the classic row driver.
-- **10M was skipped**, as above, to stay under a 5 GiB RSS guard on a 15.6
-  GiB box.
-- **Shared machine.** Other benches ran concurrently, so treat absolute
-  seconds as noisy. Compare paths inside one snapshot.
+- **10M was skipped**, as above, to stay under a 5 GiB RSS guard.
+- **Single laptop run.** Treat absolute seconds as indicative and compare paths
+  inside one snapshot.
 - **Flight SQL `rows` vs `arrow` are not the same client.** `rows` uses
   `flightsql-dbapi` (the library Superset's DataFusion extra points at) plus
   `DataFusionEngineSpec`. `arrow` / `adbc_rows` use `adbc-driver-flightsql`
@@ -307,11 +276,10 @@ with more headroom could rerun with a higher `--max-rss-gb`.
   divergences (integer width, decimal precision metadata, JSON whitespace in
   the IPC payload, some Flight SQL date conversions) are
   listed in [`docs/type-parity.md`](docs/type-parity.md) and asserted by
-  `just test` when the services are up. Postgres interval values now match the
-  row path in constructor tests (`1 day 02:03:04` is 93784000.0 ms). The
-  committed live golden still shows the old interval divergence because
-  `just parity` was not re-run. Constructor
-  tests that do not need services live in `tests/test_from_arrow_unit.py`.
+  `just test` when the services are up. Postgres interval values match the
+  psycopg2 row path live (`1 day 02:03:04` is 93784000.0 ms); the golden was
+  regenerated on 2026-11-14. Constructor tests that do not need services live
+  in `tests/test_from_arrow_unit.py`.
 - **UUID stringification is vectorized in the patch** (NumPy, not the
   per-value Python loop in `stringify_extension_columns`). That loop
   dominated the Postgres Arrow result-set stage before the change. A

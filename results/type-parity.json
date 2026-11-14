@@ -600,51 +600,6 @@
      ]
     },
     {
-     "column": "iv",
-     "arrow_types": [
-      "double",
-      "month_day_nano_interval"
-     ],
-     "py_types": [
-      [
-       "float"
-      ],
-      [
-       "DateOffset"
-      ]
-     ],
-     "values": {
-      "n_diff": 1,
-      "example": [
-       [
-        "f",
-        "93784000.0"
-       ],
-       [
-        "DateOffset",
-        "<DateOffset: days=1, months=0, nanoseconds=7384000000000>"
-       ]
-      ]
-     },
-     "ipc_values": {
-      "n_diff": 1,
-      "example": [
-       [
-        "f",
-        "93784000.0"
-       ],
-       [
-        "MonthDayNano",
-        [
-         0,
-         1,
-         7384000000000
-        ]
-       ]
-      ]
-     }
-    },
-    {
      "column": "json_scalar",
      "arrow_types": [
       "int64",
@@ -807,6 +762,10 @@
     },
     {
      "column": "iv",
+     "arrow_types": [
+      "month_day_nano_interval",
+      "double"
+     ],
      "columns": [
       [
        "DATETIME",
@@ -818,7 +777,45 @@
        "0",
        false
       ]
-     ]
+     ],
+     "py_types": [
+      [
+       "DateOffset"
+      ],
+      [
+       "float"
+      ]
+     ],
+     "values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "DateOffset",
+        "<DateOffset: days=1, months=0, nanoseconds=7384000000000>"
+       ],
+       [
+        "f",
+        "93784000.0"
+       ]
+      ]
+     },
+     "ipc_values": {
+      "n_diff": 1,
+      "example": [
+       [
+        "MonthDayNano",
+        [
+         0,
+         1,
+         7384000000000
+        ]
+       ],
+       [
+        "f",
+        "93784000.0"
+       ]
+      ]
+     }
     },
     {
      "column": "int_array",
@@ -1422,7 +1419,7 @@
       "dup__1": "int32",
       "numeric_nan": "string",
       "numeric_wide": "decimal256(76, 9)",
-      "iv": "month_day_nano_interval",
+      "iv": "double",
       "int_array": "string",
       "jsonb_obj": "string",
       "json_scalar": "string",

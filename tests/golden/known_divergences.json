@@ -143,7 +143,11 @@
   "columns"
  ],
  "postgres/edge_cases/adbc_rows_vs_arrow/iv": [
-  "columns"
+  "arrow_types",
+  "columns",
+  "ipc_values",
+  "py_types",
+  "values"
  ],
  "postgres/edge_cases/adbc_rows_vs_arrow/json_scalar": [
   "columns"
@@ -179,12 +183,6 @@
  ],
  "postgres/edge_cases/rows_vs_arrow/dup__1": [
   "arrow_types"
- ],
- "postgres/edge_cases/rows_vs_arrow/iv": [
-  "arrow_types",
-  "ipc_values",
-  "py_types",
-  "values"
  ],
  "postgres/edge_cases/rows_vs_arrow/json_scalar": [
   "arrow_types",

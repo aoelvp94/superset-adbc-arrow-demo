@@ -38,16 +38,28 @@ def reset_peak_rss() -> bool:
 
 
 def peak_rss_bytes() -> int:
-    with open("/proc/self/status") as fh:
-        for line in fh:
-            if line.startswith("VmHWM:"):
-                return int(line.split()[1]) * 1024
-    raise RuntimeError("VmHWM not available")
+    try:
+        with open("/proc/self/status") as fh:
+            for line in fh:
+                if line.startswith("VmHWM:"):
+                    return int(line.split()[1]) * 1024
+    except OSError:
+        pass
+    # macOS: process-lifetime peak, reported in bytes; it cannot be reset.
+    import resource
+
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak if sys.platform == "darwin" else peak * 1024
 
 
 def rss_bytes() -> int:
-    with open("/proc/self/statm") as fh:
-        return int(fh.read().split()[1]) * os.sysconf("SC_PAGE_SIZE")
+    try:
+        with open("/proc/self/statm") as fh:
+            return int(fh.read().split()[1]) * os.sysconf("SC_PAGE_SIZE")
+    except OSError:
+        import psutil
+
+        return psutil.Process().memory_info().rss
 
 
 def spec_for(backend: str, path: str):

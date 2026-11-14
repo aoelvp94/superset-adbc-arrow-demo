@@ -1,7 +1,7 @@
 # patches/0001-arrow-native-result-set.patch
 
-Local prototype against apache/superset master `14365bbebd3ecfb3d9a0c1304908248d5fbeb3d4`
-(see `../SUPERSET_COMMIT`; master as of 2026-11-11). Not submitted upstream. Apply with:
+Local prototype against apache/superset master `f81191d55eef3e0fa3ae04b1c83d4e474a2a392a`
+(see `../SUPERSET_COMMIT`; master as of 2026-11-14). Not submitted upstream. Apply with:
 
 ```bash
 git -C <superset checkout at that commit> apply --index patches/0001-arrow-native-result-set.patch
@@ -9,9 +9,11 @@ git -C <superset checkout at that commit> apply --index patches/0001-arrow-nativ
 
 `just venv` does this in `.cache/superset` and installs the result.
 
-The previous snapshot (2026-11-10) was taken against `a131fcb623d88ed9eb7e7a414e226437423d645c`.
-An intermediate pin, `7d715a82a69a40389d0f4ce20f0e8ccfb17ce889`, touched none of
-the files in this patch. The numbers in `results/` were not re-run after either move.
+Earlier pins: `a131fcb` (2026-11-10 snapshot, archived in `results/archive/`),
+`7d715a8` and `14365bb`. Moving to `f81191d` needed no patch change: upstream
+touched `config.py`, `db_engine_specs/base.py` and `models/core.py` in that
+range, but not the code the patch changes. The numbers in `results/` were
+measured on `f81191d`.
 
 | file | change |
 |---|---|
