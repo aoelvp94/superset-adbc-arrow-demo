@@ -13,12 +13,19 @@ metadata, `convert_pa_dtype` does not name decimals, and `from_arrow` does not
 invent a generic type the row path does not report. Postgres `POSTGRESQL:type`
 metadata is what makes the type string match psycopg2.
 
-Two differences are intentional and pinned in those tests:
+These differences are intentional and pinned in those tests:
 
 * A non-finite `Decimal` makes the row constructor stringify the whole column, because
   `pa.array` rejects it. `from_arrow` nulls only the non-finite cells and keeps finite
   values as decimals (the same per-cell rule `stringify_values` states: NaN and
   Infinity have no exact value).
+* An all-NULL column keeps its declared Arrow type (for example `double`,
+  `string`, `timestamp[us, tz=UTC]`). The row constructor builds an Arrow
+  `null` column instead. `type_generic` and `df_to_records` output are equal,
+  but the pandas dtype differs (`float64` / `str` / `datetime64` vs `object`).
+  `tests/test_from_arrow_parity_matrix.py` asserts both.
+* An `int32` column keeps its width; the row path re-infers `int64`. Values
+  and records are equal.
 * On `PostgresEngineSpec`, `from_arrow` applies the same milliseconds conversion
   `fetch_data` applies to a timedelta. `month_day_nano_interval` uses psycopg2's
   day counts (a year is 365 days, a month is 30) before `_normalize_interval`.
