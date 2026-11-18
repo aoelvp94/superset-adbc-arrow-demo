@@ -1,4 +1,4 @@
-"""Render BENCH.md from a results/bench-*.json snapshot (numbers only from JSON)."""
+"""Render results/BENCH.md from a results/bench-*.json snapshot (numbers only from JSON)."""
 
 from __future__ import annotations
 
@@ -88,7 +88,7 @@ def render(snap: dict, title: str = "# Benchmark results") -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("snapshots", nargs="+")
-    ap.add_argument("--out", default=os.path.join(common.ROOT, "BENCH.md"))
+    ap.add_argument("--out", default=os.path.join(common.ROOT, "results", "BENCH.md"))
     args = ap.parse_args()
     parts = []
     for i, path in enumerate(args.snapshots):

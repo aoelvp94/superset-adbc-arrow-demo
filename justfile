@@ -1,4 +1,4 @@
-# superset-adbc-arrow-bench: local-only, reproducible.
+# superset-adbc-arrow-demo: local-only, reproducible.
 # Requires: docker (compose v2), uv, just, git. Python 3.11 is fetched by uv.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
@@ -19,7 +19,7 @@ default:
 
 # Everything a reviewer needs: services, venv, data, tests, bench, report.
 reproduce: up venv setup-data check-datafusion-extra test parity bench bench-large render
-    @echo "done: see BENCH.md, results/, docs/type-parity.md"
+    @echo "done: see results/BENCH.md, results/, docs/type-parity.md"
 
 up:
     docker compose up -d --build --wait
@@ -50,7 +50,7 @@ venv: superset-src
 setup-data:
     {{PY}} bench/setup_data.py --rows 1000 {{ROWS}} {{LARGE_ROWS}}
 
-# Task A: is apache-superset[datafusion] resolvable? (writes evidence/task-a)
+# Is apache-superset[datafusion] resolvable? (writes evidence/datafusion-extra)
 check-datafusion-extra:
     bash scripts/check_datafusion_extra.sh
 
@@ -84,7 +84,7 @@ bench-quick:
     {{PY}} bench/render.py results/bench-quick.json --out results/BENCH-quick.md
 
 render main="results/bench-latest.json" large="results/bench-large-latest.json":
-    {{PY}} bench/render.py {{main}} {{large}} --out BENCH.md
+    {{PY}} bench/render.py {{main}} {{large}} --out results/BENCH.md
 
 clean:
     rm -rf data .cache results/bench-latest.json results/bench-quick.json

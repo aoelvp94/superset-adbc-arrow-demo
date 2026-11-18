@@ -8,7 +8,7 @@ For each backend, the same query is materialized three ways:
 and compared on: pa_table schema, .columns (type / type_generic / is_dttm),
 sync-path records (Superset's to_pandas_df + df_to_records), IPC payload
 values (pa_table), and nested_columns. No pandas in this module. Used by the pytest
-golden tests and by `just parity` to write docs/type-parity.md.
+golden tests and by `just parity` to write results/type-parity.json.
 """
 
 from __future__ import annotations
