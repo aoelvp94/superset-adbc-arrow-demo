@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Task A: verify whether apache-superset[datafusion] can be resolved.
-# Writes resolver output + PyPI metadata into evidence/task-a/.
+# Check whether apache-superset[datafusion] can be resolved.
+# Writes resolver output + PyPI metadata into evidence/datafusion-extra/.
 set -uo pipefail
 cd "$(dirname "$0")/.."
-OUT=evidence/task-a
+OUT=evidence/datafusion-extra
 SRC=${SUPERSET_SRC:-.cache/superset}
 mkdir -p "$OUT"
 

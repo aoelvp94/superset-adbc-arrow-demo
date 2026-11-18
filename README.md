@@ -9,6 +9,20 @@ apache/superset. Nothing in this tree is filed upstream.
 Everything runs locally. Postgres and a [GizmoSQL](https://github.com/gizmosql/gizmosql)
 Flight SQL server run in Docker; DuckDB is a file on disk.
 
+## At a glance
+
+- **What changes:** `SupersetResultSet.from_arrow(table, db_engine_spec)` builds a result
+  set straight from a `pyarrow.Table`. It is off by default (feature flag plus a
+  per-engine opt-in) and falls back to the row path. See [Opt-in](#opt-in).
+- **Speed at 1M rows (fetch + result set + IPC):** 10.7× faster on Postgres, 26.8× on
+  DuckDB, 18.7× on Flight SQL. Including `to_pandas_df()`: 6.6× / 22.2× / 18.0×.
+  See [Results](#results).
+- **Types:** `type_generic` and `is_dttm` match the row path on every column, on all
+  three backends. Remaining differences are listed and pinned in tests:
+  [`docs/type-parity.md`](docs/type-parity.md).
+- **Where to start reading:** [`patches/README.md`](patches/README.md) (what the patch
+  touches), then [`docs/type-parity.md`](docs/type-parity.md).
+
 ## Two layers
 
 Query results are still expensive in two different places. This repo is only the
@@ -68,8 +82,9 @@ classic row driver. It is not a proposed feature.
 ## What the snapshot measured
 
 The numbers below are the 2026-11-14 run against apache/superset master
-`f81191d55eef3e0fa3ae04b1c83d4e474a2a392a` plus the patch in this tree, the
-same patch that #5–#7 built, applied cleanly. The previous snapshot (2026-11-10,
+`f81191d55eef3e0fa3ae04b1c83d4e474a2a392a` plus the patch in this tree (built up in
+this repo's PRs [5](https://github.com/aoelvp94/superset-adbc-arrow-demo/pull/5)–[7](https://github.com/aoelvp94/superset-adbc-arrow-demo/pull/7)),
+which applied cleanly. The previous snapshot (2026-11-10,
 pin `a131fcb`, different machine) is kept in
 [`results/archive/2026-11-10-a131fcb/`](results/archive/2026-11-10-a131fcb/)
 for comparison; it is not what the tables below report. The Arrow path is an
@@ -125,7 +140,9 @@ deterministically in each engine.
 | `justfile` | Setup, tests, bench, and render entry points. |
 | `results/` | Committed snapshots from the 2026-11-14 run, plus `pip-freeze.txt`. Older runs are in `results/archive/`. |
 | `docs/type-parity.md` | Observed type differences between the row and Arrow paths. |
-| `evidence/task-a/` | Does `apache-superset[datafusion]` resolve? (It does not, today.) |
+| `evidence/datafusion-extra/` | Does `apache-superset[datafusion]` resolve? (It did not when checked, on pin `a131fcb`.) Written by `just check-datafusion-extra`. |
+| `evidence/superset-unit-tests-patched.txt` | Superset's own unit tests on the patched tree (pin `a131fcb`); the one failure also fails unpatched. |
+| `evidence/sqlalchemy-adbc-reflection.txt` | Manual check that `sqlalchemy-adbc` reflection works against GizmoSQL. |
 
 ## Reproduce
 
